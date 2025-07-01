@@ -123,6 +123,47 @@ def test_config_show_command_with_key():
 def test_config_set_command():
     """Test the config set command."""
     runner = CliRunner()
-    result = runner.invoke(cli, ["config", "set", "--key", "test", "--value", "value"])
+    result = runner.invoke(
+        cli, ["config", "set", "--key", "test", "--value", "value"])
     assert result.exit_code == 0
     assert "Setting test = value" in result.output
+
+
+def test_process_command():
+    """Test the process command."""
+    runner = CliRunner()
+
+    # Create a temporary test file
+    with runner.isolated_filesystem():
+        # Create test Python file
+        with open("test_file.py", "w") as f:
+            f.write(
+                """
+test_dict = {"key": "value", "number": 42}
+config = {"app": "test", "version": "1.0"}
+_private = {"secret": "hidden"}
+not_a_dict = "string value"
+"""
+            )
+
+        # Run the process command
+        result = runner.invoke(
+            cli, ["process", "test_file.py", "--out", "output"])
+        assert result.exit_code == 0
+        assert "Successfully processed: 1 files" in result.output
+
+        # Check that output file was created
+        import json
+        import os
+
+        assert os.path.exists("output/test_file.json")
+
+        # Check the content
+        with open("output/test_file.json") as f:
+            data = json.load(f)
+
+        assert "test_dict" in data
+        assert "config" in data
+        assert "_private" not in data  # Should be filtered out
+        assert data["test_dict"]["key"] == "value"
+        assert data["config"]["app"] == "test"

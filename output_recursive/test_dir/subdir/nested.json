@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "created_by": "test",
+    "timestamp": "2025-01-01"
+  },
+  "nested_data": {
+    "level": "deep",
+    "items": [
+      1,
+      2,
+      3
+    ]
+  }
+}

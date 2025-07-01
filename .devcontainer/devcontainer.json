@@ -20,7 +20,10 @@
       "settings": {
         "python.defaultInterpreterPath": ".venv/bin/python",
         "python.terminal.activateEnvironment": true,
-        "python.linting.enabled": false,
+        "python.linting.enabled": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.indentSize": 2,
         "files.exclude": {
           "**/__pycache__": true,
           "**/*.pyc": true,

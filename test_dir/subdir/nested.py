@@ -1,0 +1,11 @@
+"""Nested test file."""
+
+nested_data = {
+    "level": "deep",
+    "items": [1, 2, 3]
+}
+
+metadata = {
+    "created_by": "test",
+    "timestamp": "2025-01-01"
+}
