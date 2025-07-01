@@ -1,6 +1,8 @@
 {
-  "name": "Python 3",
-  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bullseye",
+  "name": "Python 3 with UV",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "cli",
+  "workspaceFolder": "/workspaces/efemel",
 
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
@@ -12,19 +14,39 @@
 
   "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=\"$HOME/.cargo/bin:$PATH\" && uv sync --extra dev && uv pip install -e .",
 
+  // Configure tool-specific properties.
   "customizations": {
     "vscode": {
       "settings": {
         "python.defaultInterpreterPath": ".venv/bin/python",
         "python.terminal.activateEnvironment": true,
-        "python.linting.enabled": false
+        "python.linting.enabled": false,
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/*.pyc": true,
+          ".pytest_cache": true,
+          ".ruff_cache": true,
+          ".uv-cache": true
+        }
       },
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
         "charliermarsh.ruff",
-        "ms-toolsai.jupyter"
+        "ms-toolsai.jupyter",
+        "ms-vscode.makefile-tools"
       ]
     }
-  }
+  },
+
+  // Forward ports for potential web servers or APIs
+  // "forwardPorts": [8000, 8080],
+
+  // Uncomment to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
+  // "remoteUser": "root",
+
+  // Mount the workspace folder and preserve file permissions
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspaces/efemel,type=bind,consistency=cached"
+  ]
 }
