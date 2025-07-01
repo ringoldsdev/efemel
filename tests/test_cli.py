@@ -9,10 +9,7 @@ from efemel.cli import cli
 
 
 def get_files(expected_outputs_dir: Path, glob_pattern: str = "**/*.json"):
-  return [
-    str(json_file.relative_to(expected_outputs_dir))
-    for json_file in expected_outputs_dir.glob(glob_pattern)
-  ]
+  return [str(json_file.relative_to(expected_outputs_dir)) for json_file in expected_outputs_dir.glob(glob_pattern)]
 
 
 def get_test_scenarios():
@@ -35,12 +32,8 @@ def get_test_scenarios():
   ]
 
 
-@pytest.mark.parametrize(
-  "scenario_name,inputs_dir,outputs_dir,process_args", get_test_scenarios()
-)
-def test_process_command_comprehensive(
-  scenario_name, inputs_dir, outputs_dir, process_args
-):
+@pytest.mark.parametrize("scenario_name,inputs_dir,outputs_dir,process_args", get_test_scenarios())
+def test_process_command_comprehensive(scenario_name, inputs_dir, outputs_dir, process_args):
   """
   Test the process command with all input files and compare to expected outputs.
   This test runs for each input/output folder pair found in the tests directory.
@@ -63,18 +56,14 @@ def test_process_command_comprehensive(
 
     # Run the process command on all Python files recursively
     result = runner.invoke(cli, process_args)
-    assert result.exit_code == 0, (
-      f"Command failed for scenario '{scenario_name}' with output: {result.output}"
-    )
+    assert result.exit_code == 0, f"Command failed for scenario '{scenario_name}' with output: {result.output}"
 
     # Compare content of each file
     for file_path in get_files(outputs_dir):
       generated_file = Path("output") / file_path
       expected_file = outputs_dir / file_path
 
-      assert generated_file.exists(), (
-        f"Generated file {generated_file} not found for scenario '{scenario_name}'"
-      )
+      assert generated_file.exists(), f"Generated file {generated_file} not found for scenario '{scenario_name}'"
 
       # Load both JSON files
       with open(generated_file) as f:

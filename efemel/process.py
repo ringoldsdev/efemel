@@ -44,11 +44,7 @@ def set_dynamic_import_environment(environment: str):
   This should be called early in your application's lifecycle.
   """
   # Remove any existing EnvironmentModuleFinder to avoid duplicates
-  sys.meta_path[:] = [
-    finder
-    for finder in sys.meta_path
-    if not isinstance(finder, EnvironmentModuleFinder)
-  ]
+  sys.meta_path[:] = [finder for finder in sys.meta_path if not isinstance(finder, EnvironmentModuleFinder)]
 
   # Insert our custom finder at the beginning of sys.meta_path
   # This ensures it's checked before the default finders

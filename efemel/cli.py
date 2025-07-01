@@ -31,9 +31,7 @@ def info():
 @click.argument("file_pattern")
 @click.option("--out", "-o", required=True, help="Output directory for JSON files")
 @click.option("--env", "-e", help="Environment for processing (default: none)")
-@click.option(
-  "--cwd", "-c", help="Working directory to search for files (default: current)"
-)
+@click.option("--cwd", "-c", help="Working directory to search for files (default: current)")
 def process(file_pattern, out, cwd, env):
   """Process Python files and extract public dictionary variables to JSON.
 
@@ -52,9 +50,7 @@ def process(file_pattern, out, cwd, env):
 
     transformed_data = transformer.transform(public_dicts)
 
-    output_file = writer.write(
-      transformed_data, file_path.with_suffix(transformer.suffix)
-    )
+    output_file = writer.write(transformed_data, file_path.with_suffix(transformer.suffix))
 
     click.echo(f"Processed: {reader.cwd / file_path} → {output_file}")
 
