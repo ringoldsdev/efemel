@@ -33,141 +33,170 @@ def info():
 @cli.command()
 @click.argument("file_pattern")
 @click.option("--out", "-o", required=True, help="Output directory for JSON files")
+@click.option(
+  "--cwd", "-c", help="Working directory to search for files (default: current)"
+)
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")
-def process(file_pattern, out, verbose):
+def process(file_pattern, out, cwd, verbose):
   """Process Python files and extract public dictionary variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
   """
   import importlib.util
   import json
+  import os
   import sys
   from glob import glob
   from pathlib import Path
 
-  output_dir = Path(out)
-  output_dir.mkdir(parents=True, exist_ok=True)
+  # Change to the specified working directory if provided
+  original_cwd = os.getcwd()
+  if cwd:
+    cwd_path = Path(cwd)
+    if not cwd_path.is_absolute():
+      cwd_path = Path(original_cwd) / cwd_path
+    cwd_path = cwd_path.resolve()
+    if not cwd_path.exists():
+      click.echo(f"Error: Working directory '{cwd}' does not exist")
+      return
+    if not cwd_path.is_dir():
+      click.echo(f"Error: '{cwd}' is not a directory")
+      return
+    os.chdir(cwd_path)
+    if verbose:
+      click.echo(f"Changed working directory to: {cwd_path}")
 
-  if verbose:
-    click.echo(f"Searching for files matching: {file_pattern}")
-    click.echo(f"Output directory: {output_dir.absolute()}")
+  try:
+    output_dir = Path(out)
+    # If output path is relative, make it relative to original working directory
+    if not output_dir.is_absolute():
+      output_dir = Path(original_cwd) / output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-  # Find matching files
-  matching_files = glob(file_pattern, recursive=True)
-  python_files = [f for f in matching_files if f.endswith(".py")]
+    if verbose:
+      click.echo(f"Searching for files matching: {file_pattern}")
+      click.echo(f"Output directory: {output_dir.absolute()}")
 
-  if not python_files:
-    click.echo(f"No Python files found matching pattern: {file_pattern}")
-    return
+    # Find matching files
+    matching_files = glob(file_pattern, recursive=True)
+    python_files = [f for f in matching_files if f.endswith(".py")]
 
-  if verbose:
-    click.echo(f"Found {len(python_files)} Python files to process")
+    if not python_files:
+      click.echo(f"No Python files found matching pattern: {file_pattern}")
+      return
 
-  # Determine if we should preserve directory structure
-  # If there's only one file and no glob patterns, use just filename
-  # Otherwise, preserve relative directory structure
-  preserve_structure = len(python_files) > 1 or "*" in file_pattern
+    if verbose:
+      click.echo(f"Found {len(python_files)} Python files to process")
 
-  processed_count = 0
-  error_count = 0
+    # Determine if we should preserve directory structure
+    # If there's only one file and no glob patterns, use just filename
+    # Otherwise, preserve relative directory structure
+    preserve_structure = len(python_files) > 1 or "*" in file_pattern
 
-  for file_path in python_files:
-    try:
-      if verbose:
-        click.echo(f"\nProcessing: {file_path}")
+    processed_count = 0
+    error_count = 0
 
-      # Convert to Path object for easier manipulation
-      py_file = Path(file_path)
-
-      # Create output path
-      if preserve_structure:
-        # Preserve directory structure relative to current working directory
-        relative_path = py_file.with_suffix(".json")
-        output_file = output_dir / relative_path
-      else:
-        # Use just the filename
-        output_filename = py_file.stem + ".json"
-        output_file = output_dir / output_filename
-
-      # Ensure output directory exists
-      output_file.parent.mkdir(parents=True, exist_ok=True)
-
-      # Load the module dynamically
-      spec = importlib.util.spec_from_file_location("dynamic_module", py_file)
-      if spec is None or spec.loader is None:
-        if verbose:
-          click.echo(f"  ⚠️  Could not create module spec for {file_path}")
-        error_count += 1
-        continue
-
-      module = importlib.util.module_from_spec(spec)
-
-      # Add to sys.modules temporarily to handle relative imports
-      temp_module_name = f"temp_module_{processed_count}"
-      sys.modules[temp_module_name] = module
-
+    for file_path in python_files:
       try:
-        spec.loader.exec_module(module)
-      except Exception as e:
         if verbose:
-          click.echo(f"  ❌ Error executing module: {e}")
-        error_count += 1
-        continue
-      finally:
-        # Clean up sys.modules
-        sys.modules.pop(temp_module_name, None)
+          click.echo(f"\nProcessing: {file_path}")
 
-      # Extract public dictionary variables
-      public_dicts = {}
+        # Convert to Path object for easier manipulation
+        py_file = Path(file_path)
 
-      for attr_name in dir(module):
-        # Skip private/protected attributes (starting with _)
-        if attr_name.startswith("_"):
-          continue
+        # Create output path
+        if preserve_structure:
+          # Preserve directory structure relative to current working directory
+          relative_path = py_file.with_suffix(".json")
+          output_file = output_dir / relative_path
+        else:
+          # Use just the filename
+          output_filename = py_file.stem + ".json"
+          output_file = output_dir / output_filename
 
-        try:
-          attr_value = getattr(module, attr_name)
+        # Ensure output directory exists
+        output_file.parent.mkdir(parents=True, exist_ok=True)
 
-          # Check if it's a dictionary
-          if isinstance(attr_value, dict):
-            public_dicts[attr_name] = attr_value
-            if verbose:
-              items_count = len(attr_value)
-              click.echo(f"  📖 Found dict: {attr_name} ({items_count} items)")
-
-        except Exception as e:
+        # Load the module dynamically
+        spec = importlib.util.spec_from_file_location("dynamic_module", py_file)
+        if spec is None or spec.loader is None:
           if verbose:
-            click.echo(f"  ⚠️  Could not access attribute {attr_name}: {e}")
-          continue
-      # Write to JSON file
-      if public_dicts:
-        try:
-          with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(public_dicts, f, indent=2, ensure_ascii=False, default=str)
-
-          if verbose:
-            dict_count = len(public_dicts)
-            click.echo(f"  ✅ Saved {dict_count} dict(s) to: {output_file}")
-
-          processed_count += 1
-
-        except Exception as e:
-          click.echo(f"  ❌ Error writing JSON file {output_file}: {e}")
+            click.echo(f"  ⚠️  Could not create module spec for {file_path}")
           error_count += 1
-      else:
-        if verbose:
-          click.echo(f"  ℹ️  No public dictionaries found in {file_path}")
+          continue
 
-    except Exception as e:
-      click.echo(f"❌ Error processing {file_path}: {e}")
-      error_count += 1
+        module = importlib.util.module_from_spec(spec)
 
-  # Summary
-  click.echo("\n📊 Processing complete:")
-  click.echo(f"  ✅ Successfully processed: {processed_count} files")
-  if error_count > 0:
-    click.echo(f"  ❌ Errors encountered: {error_count} files")
-  click.echo(f"  📁 Output directory: {output_dir.absolute()}")
+        # Add to sys.modules temporarily to handle relative imports
+        temp_module_name = f"temp_module_{processed_count}"
+        sys.modules[temp_module_name] = module
+
+        try:
+          spec.loader.exec_module(module)
+        except Exception as e:
+          if verbose:
+            click.echo(f"  ❌ Error executing module: {e}")
+          error_count += 1
+          continue
+        finally:
+          # Clean up sys.modules
+          sys.modules.pop(temp_module_name, None)
+
+        # Extract public dictionary variables
+        public_dicts = {}
+
+        for attr_name in dir(module):
+          # Skip private/protected attributes (starting with _)
+          if attr_name.startswith("_"):
+            continue
+
+          try:
+            attr_value = getattr(module, attr_name)
+
+            # Check if it's a dictionary
+            if isinstance(attr_value, dict):
+              public_dicts[attr_name] = attr_value
+              if verbose:
+                items_count = len(attr_value)
+                click.echo(f"  📖 Found dict: {attr_name} ({items_count} items)")
+
+          except Exception as e:
+            if verbose:
+              click.echo(f"  ⚠️  Could not access attribute {attr_name}: {e}")
+            continue
+        # Write to JSON file
+        if public_dicts:
+          try:
+            with open(output_file, "w", encoding="utf-8") as f:
+              json.dump(public_dicts, f, indent=2, ensure_ascii=False, default=str)
+
+            if verbose:
+              dict_count = len(public_dicts)
+              click.echo(f"  ✅ Saved {dict_count} dict(s) to: {output_file}")
+
+            processed_count += 1
+
+          except Exception as e:
+            click.echo(f"  ❌ Error writing JSON file {output_file}: {e}")
+            error_count += 1
+        else:
+          if verbose:
+            click.echo(f"  ℹ️  No public dictionaries found in {file_path}")
+
+      except Exception as e:
+        click.echo(f"❌ Error processing {file_path}: {e}")
+        error_count += 1
+
+    # Summary
+    click.echo("\n📊 Processing complete:")
+    click.echo(f"  ✅ Successfully processed: {processed_count} files")
+    if error_count > 0:
+      click.echo(f"  ❌ Errors encountered: {error_count} files")
+    click.echo(f"  📁 Output directory: {output_dir.absolute()}")
+
+  finally:
+    # Always restore the original working directory
+    os.chdir(original_cwd)
 
 
 def main():
