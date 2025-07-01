@@ -1,5 +1,4 @@
 import json
-import os
 import shutil
 from pathlib import Path
 
@@ -8,107 +7,61 @@ from click.testing import CliRunner
 from efemel.cli import cli
 
 
-def test_process_command():
-  """Test the process command with a single file."""
+def test_process_command_comprehensive():
+  """
+  Test the process command with all input files and compare to expected outputs.
+  Make sure that you've run `make generate-test-outputs` to create the expected outputs.
+  """
   runner = CliRunner()
   test_inputs_dir = Path(__file__).parent / "inputs"
+  expected_outputs_dir = Path(__file__).parent / "outputs"
 
   with runner.isolated_filesystem():
-    # Copy test file to isolated filesystem
-    shutil.copy(test_inputs_dir / "simple_test.py", "test_file.py")
+    # Copy all .py files recursively using glob
+    for py_file in test_inputs_dir.glob("**/*.py"):
+      # Calculate relative path from inputs directory
+      rel_path = py_file.relative_to(test_inputs_dir)
+      target_path = Path(rel_path)
 
-    # Run the process command
-    result = runner.invoke(cli, ["process", "test_file.py", "--out", "output"])
-    assert result.exit_code == 0
-    assert "Successfully processed: 1 files" in result.output
+      # Create parent directories if they don't exist
+      target_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Check that output file was created
-    assert os.path.exists("output/test_file.json")
+      # Copy the file
+      shutil.copy(py_file, target_path)
 
-    # Check the content
-    with open("output/test_file.json") as f:
-      data = json.load(f)
-
-    assert "test_dict" in data
-    assert "config" in data
-    assert "_private" not in data  # Should be filtered out
-    assert data["test_dict"]["key"] == "value"
-    assert data["config"]["app"] == "test"
-
-
-def test_process_command_with_test_inputs():
-  """Test the process command with actual test input files."""
-  runner = CliRunner()
-  test_inputs_dir = Path(__file__).parent / "inputs"
-
-  with runner.isolated_filesystem():
-    # Copy test file to isolated filesystem
-    shutil.copy(test_inputs_dir / "test_data.py", "test_data.py")
-
-    # Run the process command
-    result = runner.invoke(cli, ["process", "test_data.py", "--out", "output"])
-    assert result.exit_code == 0
-    assert "Successfully processed: 1 files" in result.output
-
-    # Check that output file was created
-    output_file = Path("output/test_data.json")
-    assert output_file.exists()
-
-    # Check the content
-    with open(output_file) as f:
-      data = json.load(f)
-
-    # Should contain the public dicts from test_data.py
-    assert len(data) > 0  # Should have found some dictionaries
-    assert "config" in data
-    assert "settings" in data
-    assert "user_data" in data
-
-
-def test_process_command_entire_folder():
-  """Test the process command with an entire folder."""
-  runner = CliRunner()
-  test_inputs_dir = Path(__file__).parent / "inputs"
-
-  with runner.isolated_filesystem():
-    # Copy the entire test_dir structure to isolated filesystem
-    shutil.copytree(test_inputs_dir / "test_dir", "test_project")
-
-    # Run the process command on the entire folder using glob pattern
-    result = runner.invoke(
-      cli, ["process", "test_project/**/*.py", "--out", "output", "--verbose"]
-    )
+    # Run the process command on all Python files recursively
+    result = runner.invoke(cli, ["process", "**/*.py", "--out", "output", "--verbose"])
     assert result.exit_code == 0, f"Command failed with output: {result.output}"
-    # Should process files with dictionaries (config.py and nested.py)
-    # utils.py has no dictionaries so won't be processed
-    assert "Successfully processed: 2 files" in result.output
 
-    # Check that output files were created for files with dictionaries
-    # Should preserve directory structure
-    expected_config = "output/test_project/config.json"
-    expected_nested = "output/test_project/subdir/nested.json"
-    expected_utils = "output/test_project/utils.json"
+    # Collect all generated output files
+    generated_files = []
+    for json_file in Path("output").glob("**/*.json"):
+      rel_path = json_file.relative_to("output")
+      generated_files.append(str(rel_path))
 
-    assert os.path.exists(expected_config), f"Expected file {expected_config} not found"
-    assert os.path.exists(expected_nested), f"Expected file {expected_nested} not found"
-    # utils.py should not create an output file since it has no dictionaries
-    assert not os.path.exists(expected_utils), f"Unexpected file {expected_utils} found"
+    # Collect all expected output files
+    expected_files = []
+    for json_file in expected_outputs_dir.glob("**/*.json"):
+      rel_path = json_file.relative_to(expected_outputs_dir)
+      expected_files.append(str(rel_path))
 
-    # Check the content of config.json
-    with open(expected_config) as f:
-      config_data = json.load(f)
+    # Compare content of each file
+    for file_path in expected_files:
+      generated_file = Path("output") / file_path
+      expected_file = expected_outputs_dir / file_path
 
-    assert "app_config" in config_data
-    assert "database_config" in config_data
-    assert "_internal_config" not in config_data  # Should be filtered out
-    assert config_data["app_config"]["app_name"] == "my_app"
-    assert config_data["database_config"]["pool_size"] == 10
+      assert generated_file.exists(), f"Generated file {generated_file} not found"
 
-    # Check the content of nested.json
-    with open(expected_nested) as f:
-      nested_data = json.load(f)
+      # Load both JSON files
+      with open(generated_file) as f:
+        generated_data = json.load(f)
 
-    assert "nested_data" in nested_data
-    assert "metadata" in nested_data
-    assert nested_data["nested_data"]["level"] == "deep"
-    assert nested_data["metadata"]["created_by"] == "test"
+      with open(expected_file) as f:
+        expected_data = json.load(f)
+
+      # Compare the JSON content
+      assert generated_data == expected_data, (
+        f"Content mismatch in {file_path}:\n"
+        f"Generated: {generated_data}\n"
+        f"Expected: {expected_data}"
+      )
