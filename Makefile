@@ -52,13 +52,14 @@ test:
 
 # Generate expected test outputs from test inputs
 generate-test-outputs:
-	@echo "🔄 Generating test outputs from test inputs..."
-	@rm -rf tests/outputs
-	@mkdir -p tests/outputs
-	@uv run efemel process "**/*.py" --cwd tests/inputs --out tests/outputs --verbose
-	@echo "✅ Test outputs generated in tests/outputs/"
-	@echo "📁 Files created:"
-	@find tests/outputs -name "*.json" -type f | sort
+	@rm -rf tests/outputs_basic
+	@mkdir -p tests/outputs_basic
+	@uv run efemel process "**/*.py" --cwd tests/inputs_basic --out tests/outputs_basic
+
+	@rm -rf tests/outputs_with_imports
+	@mkdir -p tests/outputs_with_imports
+	@uv run efemel process "*.py" --cwd tests/inputs_with_imports --out tests/outputs_with_imports --env prod
+
 
 # Clean build artifacts and cache files
 clean:
