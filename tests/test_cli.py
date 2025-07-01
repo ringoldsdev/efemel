@@ -30,7 +30,7 @@ def test_process_command_comprehensive():
       shutil.copy(py_file, target_path)
 
     # Run the process command on all Python files recursively
-    result = runner.invoke(cli, ["process", "**/*.py", "--out", "output", "--verbose"])
+    result = runner.invoke(cli, ["process", "**/*.py", "--out", "output"])
     assert result.exit_code == 0, f"Command failed with output: {result.output}"
 
     # Collect all generated output files
