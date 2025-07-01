@@ -5,13 +5,16 @@ build-backend = "hatchling.build"
 [project]
 name = "efemel"
 version = "0.1.0"
-description = "A Python project using UV package manager"
+description = "A Python CLI application"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [
     {name = "Your Name", email = "your.email@example.com"},
 ]
 dependencies = []
+
+[project.scripts]
+efemel = "efemel.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -42,5 +45,6 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.pytest.ini_options]
-testpaths = ["."]
+testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
+addopts = "-v"

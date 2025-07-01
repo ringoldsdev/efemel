@@ -1,6 +1,6 @@
 # Efemel
 
-A Python project set up with VS Code Development Containers and UV package manager.
+A Python CLI application built with UV package manager.
 
 ## Development Setup
 
@@ -25,8 +25,12 @@ This project uses VS Code Development Containers for a consistent development en
 efemel/
 ├── .devcontainer/
 │   └── devcontainer.json    # Dev container configuration
-├── main.py                  # Main application file
-├── test_main.py            # Test file
+├── efemel/                  # Main package directory
+│   ├── __init__.py         # Package initialization
+│   ├── main.py             # Main application logic
+│   └── cli.py              # CLI entry point
+├── tests/
+│   └── test_main.py        # Test files
 ├── pyproject.toml          # Project configuration and dependencies
 ├── .gitignore             # Git ignore rules
 └── README.md              # This file
@@ -56,15 +60,38 @@ uv sync
 uv sync --no-dev
 ```
 
+### Installing the CLI
+
+```bash
+# Install in development mode (editable)
+uv pip install -e .
+
+# Or install from source
+uv pip install .
+```
+
+### Using the CLI
+
+```bash
+# Show help
+efemel
+
+# Print hello world message
+efemel --hello
+
+# Show version
+efemel --version
+```
+
 ### Running the Project
 
 ```bash
-# Activate the virtual environment and run
-uv run python main.py
+# Run directly with UV
+uv run efemel --hello
 
-# Or activate manually and run
-source .venv/bin/activate
-python main.py
+# Or activate the virtual environment and run
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+efemel --hello
 ```
 
 ### Running Tests
