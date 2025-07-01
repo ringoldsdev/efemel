@@ -21,15 +21,18 @@
         "python.defaultInterpreterPath": ".venv/bin/python",
         "python.terminal.activateEnvironment": true,
         "python.linting.enabled": true,
-        "editor.insertSpaces": true,
-        "editor.tabSize": 2,
-        "editor.indentSize": 2,
-        "files.exclude": {
-          "**/__pycache__": true,
-          "**/*.pyc": true,
-          ".pytest_cache": true,
-          ".ruff_cache": true,
-          ".uv-cache": true
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "[python]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.tabSize": 2,
+          "editor.indentSize": 2,
+          "editor.insertSpaces": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+          }
         }
       },
       "extensions": [
@@ -37,7 +40,8 @@
         "ms-python.vscode-pylance",
         "charliermarsh.ruff",
         "ms-toolsai.jupyter",
-        "ms-vscode.makefile-tools"
+        "ms-vscode.makefile-tools",
+        "github.vscode-github-actions"
       ]
     }
   },
