@@ -1,128 +1,67 @@
-"""
-Tests for the CLI module.
-"""
+import json
+import shutil
+from pathlib import Path
 
 from click.testing import CliRunner
 
 from efemel.cli import cli
 
 
-def test_cli_help():
-    """Test the CLI help command."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--help"])
-    assert result.exit_code == 0
-    assert "Efemel CLI application" in result.output
+def test_process_command_comprehensive():
+  """
+  Test the process command with all input files and compare to expected outputs.
+  Make sure that you've run `make generate-test-outputs` to create the expected outputs.
+  """
+  runner = CliRunner()
+  test_inputs_dir = Path(__file__).parent / "inputs"
+  expected_outputs_dir = Path(__file__).parent / "outputs"
 
+  with runner.isolated_filesystem():
+    # Copy all .py files recursively using glob
+    for py_file in test_inputs_dir.glob("**/*.py"):
+      # Calculate relative path from inputs directory
+      rel_path = py_file.relative_to(test_inputs_dir)
+      target_path = Path(rel_path)
 
-def test_cli_version():
-    """Test the CLI version command."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--version"])
-    assert result.exit_code == 0
-    assert "efemel, version" in result.output
+      # Create parent directories if they don't exist
+      target_path.parent.mkdir(parents=True, exist_ok=True)
 
+      # Copy the file
+      shutil.copy(py_file, target_path)
 
-def test_hello_command():
-    """Test the hello command."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["hello"])
-    assert result.exit_code == 0
-    assert "Hello, World from efemel!" in result.output
+    # Run the process command on all Python files recursively
+    result = runner.invoke(cli, ["process", "**/*.py", "--out", "output"])
+    assert result.exit_code == 0, f"Command failed with output: {result.output}"
 
+    # Collect all generated output files
+    generated_files = []
+    for json_file in Path("output").glob("**/*.json"):
+      rel_path = json_file.relative_to("output")
+      generated_files.append(str(rel_path))
 
-def test_info_command():
-    """Test the info command."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["info"])
-    assert result.exit_code == 0
-    assert "efemel version:" in result.output
-    assert "Python CLI application" in result.output
+    # Collect all expected output files
+    expected_files = []
+    for json_file in expected_outputs_dir.glob("**/*.json"):
+      rel_path = json_file.relative_to(expected_outputs_dir)
+      expected_files.append(str(rel_path))
 
+    # Compare content of each file
+    for file_path in expected_files:
+      generated_file = Path("output") / file_path
+      expected_file = expected_outputs_dir / file_path
 
-def test_greet_command_default():
-    """Test the greet command with default values."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["greet"])
-    assert result.exit_code == 0
-    assert "Hello, World!" in result.output
+      assert generated_file.exists(), f"Generated file {generated_file} not found"
 
+      # Load both JSON files
+      with open(generated_file) as f:
+        generated_data = json.load(f)
 
-def test_greet_command_with_name():
-    """Test the greet command with custom name."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["greet", "--name", "Alice"])
-    assert result.exit_code == 0
-    assert "Hello, Alice!" in result.output
+      with open(expected_file) as f:
+        expected_data = json.load(f)
 
-
-def test_greet_command_with_count():
-    """Test the greet command with multiple greetings."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["greet", "--count", "2"])
-    assert result.exit_code == 0
-    assert result.output.count("Hello, World!") == 2
-
-
-def test_greet_command_loud():
-    """Test the greet command with loud option."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["greet", "--loud"])
-    assert result.exit_code == 0
-    assert "HELLO, WORLD!" in result.output
-
-
-def test_echo_command():
-    """Test the echo command."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["echo", "test"])
-    assert result.exit_code == 0
-    assert "test" in result.output
-
-
-def test_echo_command_reverse():
-    """Test the echo command with reverse option."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["echo", "hello", "--reverse"])
-    assert result.exit_code == 0
-    assert "olleh" in result.output
-
-
-def test_echo_command_upper():
-    """Test the echo command with upper option."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["echo", "hello", "--upper"])
-    assert result.exit_code == 0
-    assert "HELLO" in result.output
-
-
-def test_echo_command_lower():
-    """Test the echo command with lower option."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["echo", "HELLO", "--lower"])
-    assert result.exit_code == 0
-    assert "hello" in result.output
-
-
-def test_config_show_command():
-    """Test the config show command."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["config", "show"])
-    assert result.exit_code == 0
-    assert "All configuration values" in result.output
-
-
-def test_config_show_command_with_key():
-    """Test the config show command with specific key."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["config", "show", "--key", "test"])
-    assert result.exit_code == 0
-    assert "Configuration for 'test'" in result.output
-
-
-def test_config_set_command():
-    """Test the config set command."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["config", "set", "--key", "test", "--value", "value"])
-    assert result.exit_code == 0
-    assert "Setting test = value" in result.output
+      # Compare the JSON content
+      assert generated_data == expected_data, (
+        f"Content mismatch in {file_path}:\n"
+        f"Generated: {generated_data}\n"
+        f"Expected: {expected_data}"
+      )

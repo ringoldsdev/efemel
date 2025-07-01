@@ -1,23 +1,23 @@
-.PHONY: help install install-dev lint lint-fix format check test clean build upload upload-test
+.PHONY: help install install-dev lint lint-fix format check test clean build upload upload-test generate-test-outputs
 
 # Default target
 help:
 	@echo "Available commands:"
-	@echo "  install      - Install the package in editable mode"
-	@echo "  install-dev  - Install the package with development dependencies"
-	@echo "  lint         - Run ruff linter (check only)"
-	@echo "  lint-fix     - Run ruff linter and fix errors automatically"
-	@echo "  format       - Format code with ruff"
-	@echo "  check        - Run all checks (lint + format check + tests)"
-	@echo "  test         - Run tests with pytest"
-	@echo "  clean        - Clean build artifacts and cache files"
-	@echo "  build        - Build the package for distribution"
-	@echo "  upload-test  - Upload package to TestPyPI"
-	@echo "  upload       - Upload package to PyPI"
-	@echo "  info         - Show package information"
-	@echo "  run          - Show CLI help"
-	@echo "  run-hello    - Run hello command"
-	@echo "  demo         - Demonstrate CLI features"
+	@echo "  install              - Install the package in editable mode"
+	@echo "  install-dev          - Install the package with development dependencies"
+	@echo "  lint                 - Run ruff linter (check only)"
+	@echo "  lint-fix             - Run ruff linter and fix errors automatically"
+	@echo "  format               - Format code with ruff"
+	@echo "  check                - Run all checks (lint + format check + tests)"
+	@echo "  test                 - Run tests with pytest"
+	@echo "  generate-test-outputs - Generate expected test outputs from test inputs"
+	@echo "  clean                - Clean build artifacts and cache files"
+	@echo "  build                - Build the package for distribution"
+	@echo "  upload-test          - Upload package to TestPyPI"
+	@echo "  upload               - Upload package to PyPI"
+	@echo "  info                 - Show package information"
+	@echo "  run                  - Show CLI help"
+	@echo "  run-hello            - Run hello command"
 
 # Install the package in editable mode
 install:
@@ -49,6 +49,16 @@ check: lint format-check test
 # Run tests with pytest
 test:
 	uv run pytest
+
+# Generate expected test outputs from test inputs
+generate-test-outputs:
+	@echo "🔄 Generating test outputs from test inputs..."
+	@rm -rf tests/outputs
+	@mkdir -p tests/outputs
+	@uv run efemel process "**/*.py" --cwd tests/inputs --out tests/outputs --verbose
+	@echo "✅ Test outputs generated in tests/outputs/"
+	@echo "📁 Files created:"
+	@find tests/outputs -name "*.json" -type f | sort
 
 # Clean build artifacts and cache files
 clean:
@@ -86,18 +96,3 @@ run:
 # Run the CLI application with hello command
 run-hello:
 	uv run efemel hello
-
-# Demo CLI commands
-demo:
-	@echo "🚀 Demonstrating efemel CLI commands..."
-	@echo "▶️ Basic hello:"
-	uv run efemel hello
-	@echo ""
-	@echo "▶️ Custom greet:"
-	uv run efemel greet --name "Developer" --count 2
-	@echo ""
-	@echo "▶️ Echo with transformations:"
-	uv run efemel echo "Hello Click!" --reverse --upper
-	@echo ""
-	@echo "▶️ Package info:"
-	uv run efemel info
