@@ -1,211 +1,428 @@
 # Efemel
 
-A Python CLI application built with UV package manager.
+**Efemel** is a Python CLI tool that extracts public dictionary variables from Python files and exports them as JSON. It's designed to help you extract configuration data, settings, and structured data from Python code.
 
-## Development Setup
+## What does Efemel do?
 
-This project uses VS Code Development Containers with Docker Compose for a consistent development environment and UV for fast Python package management.
+Efemel processes Python files and extracts all public dictionary variables (those not starting with `_`), then exports them to JSON files while preserving directory structure.
 
-### Prerequisites
+### Example
 
-- [VS Code](https://code.visualstudio.com/)
-- [Docker](https://www.docker.com/get-started)
-- [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+Given this Python file (`config.py`):
 
-### Getting Started
+```python
+# Public dictionaries - these will be extracted
+database_config = {
+    "host": "localhost",
+    "port": 5432,
+    "name": "myapp_db"
+}
 
-1. Clone this repository
-2. Open the project in VS Code
-3. When prompted, click "Reopen in Container" or use the Command Palette (Ctrl+Shift+P) and select "Dev Containers: Reopen in Container"
-4. VS Code will build the development container using Docker Compose, install UV, and set up the virtual environment with dependencies
+api_settings = {
+    "timeout": 30,
+    "retries": 3,
+    "endpoints": ["auth", "users", "data"]
+}
 
-### Development Container Features
+# Private variables - these will be ignored
+_internal_config = {"secret": "hidden"}
+__cache_settings = {"ttl": 3600}
 
-- **Python 3.12** with UV package manager
-- **Docker Compose** setup for scalable development environment
-- **Persistent UV cache** for faster dependency installation
-- **Pre-configured VS Code extensions** (Python, Ruff, Jupyter)
-- **GitHub CLI** for seamless Git operations
-- **Ready for additional services** (Redis, PostgreSQL) when needed
+# Non-dictionaries - these will be ignored
+API_URL = "https://api.example.com"
+DEBUG = True
+```
+
+Running `efemel process config.py --out output` produces `output/config.json`:
+
+```json
+{
+  "database_config": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "myapp_db"
+  },
+  "api_settings": {
+    "timeout": 30,
+    "retries": 3,
+    "endpoints": ["auth", "users", "data"]
+  }
+}
+```
+
+## Installation
+
+```bash
+# Install in development mode
+uv pip install -e .
+
+# Or install from source
+pip install .
+```
+
+## Usage
+
+### Basic Usage
+
+```bash
+# Process a single file
+efemel process config.py --out output
+
+# Process multiple files with glob patterns
+efemel process "src/**/*.py" --out exports
+
+# Process files relative to a specific directory
+efemel process "**/*.py" --cwd /path/to/project --out output
+```
+
+### Real-world Example
+
+Consider this project structure:
+
+```
+project/
+├── config/
+│   ├── database.py
+│   └── api.py
+└── settings/
+    └── app.py
+```
+
+With these files:
+
+**config/database.py:**
+```python
+production = {
+    "host": "prod-db.company.com",
+    "port": 5432,
+    "ssl": True
+}
+
+development = {
+    "host": "localhost",
+    "port": 5432,
+    "ssl": False
+}
+```
+
+**config/api.py:**
+```python
+endpoints = {
+    "auth": "/api/v1/auth",
+    "users": "/api/v1/users",
+    "data": "/api/v1/data"
+}
+
+rate_limits = {
+    "requests_per_minute": 60,
+    "burst_limit": 100
+}
+```
+
+**settings/app.py:**
+```python
+app_config = {
+    "name": "MyApp",
+    "version": "2.1.0",
+    "features": ["auth", "api", "dashboard"]
+}
+```
+
+Running:
+```bash
+efemel process "**/*.py" --out exported_config
+```
+
+Produces:
+```
+exported_config/
+├── config/
+│   ├── database.json
+│   └── api.json
+└── settings/
+    └── app.json
+```
+
+With `exported_config/config/database.json`:
+```json
+{
+  "production": {
+    "host": "prod-db.company.com",
+    "port": 5432,
+    "ssl": true
+  },
+  "development": {
+    "host": "localhost",
+    "port": 5432,
+    "ssl": false
+  }
+}
+```
+
+## CLI Commands
+
+### `efemel process`
+
+Extract dictionary variables from Python files.
+
+**Options:**
+- `FILE_PATTERN` - Glob pattern to match Python files (e.g., `"**/*.py"`, `config.py`)
+- `--out OUTPUT_DIR` - Directory to write JSON files (required)
+- `--cwd DIRECTORY` - Working directory for file operations (optional)
+- `--env ENVIRONMENT` - Environment for dynamic imports (e.g., `prod`, `staging`) (optional)
+
+**Examples:**
+```bash
+# Single file
+efemel process config.py --out output
+
+# All Python files recursively
+efemel process "**/*.py" --out output
+
+# Files in specific directory
+efemel process "src/config/*.py" --out exported
+
+# Process relative to different directory
+efemel process "*.py" --cwd /path/to/configs --out output
+
+# Process with production environment
+efemel process "config/**/*.py" --out output --env prod
+
+# Process with staging environment and custom working directory
+efemel process "**/*.py" --cwd /app/configs --out exports --env staging
+```
+
+### `efemel info`
+
+Show package information and version.
+
+## Environment-Specific Processing
+
+Efemel supports environment-specific file loading using the `--env` option. This allows you to dynamically load different configurations based on the environment (dev, prod, staging, etc.).
+
+### How it works
+
+When you specify `--env <environment>`, Efemel will:
+1. For any `import` statements in your Python files, look for `<module>.<environment>.py` first
+2. If the environment-specific file doesn't exist, fall back to the default `<module>.py`
+
+### Example: Dev vs Production Configuration
+
+Consider this project structure:
+```
+config/
+├── main.py           # Main configuration file
+├── database.py       # Default database config
+├── database.prod.py  # Production database config
+├── cache.py          # Default cache config
+└── cache.prod.py     # Production cache config
+```
+
+**config/main.py:**
+```python
+from database import connection_config
+from cache import cache_settings
+
+# Main application configuration
+app_config = {
+    "name": "MyApp",
+    "version": "2.0.0",
+    "database": connection_config,
+    "cache": cache_settings
+}
+
+deployment = {
+    "workers": 4,
+    "timeout": 30
+}
+```
+
+**config/database.py** (development):
+```python
+connection_config = {
+    "host": "localhost",
+    "port": 5432,
+    "database": "myapp_dev",
+    "ssl": False,
+    "pool_size": 5
+}
+```
+
+**config/database.prod.py** (production):
+```python
+connection_config = {
+    "host": "prod-cluster.company.com",
+    "port": 5432,
+    "database": "myapp_production",
+    "ssl": True,
+    "pool_size": 20,
+    "ssl_cert": "/etc/ssl/prod.pem"
+}
+```
+
+**config/cache.py** (development):
+```python
+cache_settings = {
+    "type": "memory",
+    "max_size": 100,
+    "ttl": 300
+}
+```
+
+**config/cache.prod.py** (production):
+```python
+cache_settings = {
+    "type": "redis",
+    "host": "redis-cluster.company.com",
+    "port": 6379,
+    "ttl": 3600,
+    "cluster_mode": True
+}
+```
+
+### Processing with Different Environments
+
+**Development environment (default):**
+```bash
+efemel process config/main.py --out output/dev
+```
+
+This generates `output/dev/main.json`:
+```json
+{
+  "app_config": {
+    "name": "MyApp",
+    "version": "2.0.0",
+    "database": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "myapp_dev",
+      "ssl": false,
+      "pool_size": 5
+    },
+    "cache": {
+      "type": "memory",
+      "max_size": 100,
+      "ttl": 300
+    }
+  },
+  "deployment": {
+    "workers": 4,
+    "timeout": 30
+  }
+}
+```
+
+**Production environment:**
+```bash
+efemel process config/main.py --out output/prod --env prod
+```
+
+This generates `output/prod/main.json`:
+```json
+{
+  "app_config": {
+    "name": "MyApp",
+    "version": "2.0.0",
+    "database": {
+      "host": "prod-cluster.company.com",
+      "port": 5432,
+      "database": "myapp_production",
+      "ssl": true,
+      "pool_size": 20,
+      "ssl_cert": "/etc/ssl/prod.pem"
+    },
+    "cache": {
+      "type": "redis",
+      "host": "redis-cluster.company.com",
+      "port": 6379,
+      "ttl": 3600,
+      "cluster_mode": true
+    }
+  },
+  "deployment": {
+    "workers": 4,
+    "timeout": 30
+  }
+}
+```
+
+### Environment Options Examples
+
+```bash
+# Development (default behavior)
+efemel process "config/**/*.py" --out exports/dev
+
+# Production environment
+efemel process "config/**/*.py" --out exports/prod --env prod
+
+# Staging environment  
+efemel process "config/**/*.py" --out exports/staging --env staging
+
+# Test environment
+efemel process "config/**/*.py" --out exports/test --env test
+```
+
+## Development
+
+### Quick Start
+
+```bash
+# Install development dependencies
+uv sync --dev
+
+# Run tests
+uv run pytest
+
+# Run linting and formatting
+uv run ruff check .
+uv run ruff format .
+```
 
 ### Project Structure
 
 ```
 efemel/
-├── .devcontainer/
-│   ├── devcontainer.json    # Dev container configuration
-│   └── docker-compose.yml   # Docker Compose services
-├── efemel/                  # Main package directory
-│   ├── __init__.py         # Package initialization
-│   ├── main.py             # Main application logic
-│   └── cli.py              # CLI entry point
-├── tests/
-│   └── test_main.py        # Test files
-├── pyproject.toml          # Project configuration and dependencies
-├── .gitignore             # Git ignore rules
-└── README.md              # This file
+├── efemel/              # Main package
+│   ├── cli.py          # CLI interface
+│   ├── main.py         # Core logic
+│   └── process.py      # File processing
+├── tests/              # Test files and fixtures
+│   ├── inputs_basic/   # Test input files
+│   ├── outputs_basic/  # Expected outputs
+│   └── test_cli.py     # Test suite
+└── pyproject.toml      # Project configuration
 ```
-
-### Package Management with UV
-
-This project uses [UV](https://github.com/astral-sh/uv) for fast Python package management.
-
-#### Adding Dependencies
-
-```bash
-# Add a runtime dependency
-uv add requests
-
-# Add a development dependency
-uv add --dev pytest-cov
-```
-
-#### Installing Dependencies
-
-```bash
-# Install all dependencies (runtime + dev)
-uv sync
-
-# Install only runtime dependencies
-uv sync --no-dev
-```
-
-### Installing the CLI
-
-```bash
-# Install in development mode (editable)
-uv pip install -e .
-
-# Or install from source
-uv pip install .
-```
-
-### Using the CLI
-
-```bash
-# Show help
-efemel
-
-# Print hello world message
-efemel --hello
-
-# Show version
-efemel --version
-```
-
-### Running the Project
-
-```bash
-# Run directly with UV
-uv run efemel --hello
-
-# Or activate the virtual environment and run
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-efemel --hello
-```
-
-### Running Tests
-
-```bash
-# Run tests with UV
-uv run pytest
-
-# Or with activated environment
-source .venv/bin/activate
-pytest
-```
-
-### Code Formatting and Linting
-
-The project uses Ruff for both code formatting and linting:
-
-```bash
-# Format code
-uv run ruff format .
-
-# Check for linting issues
-uv run ruff check .
-
-# Fix auto-fixable linting issues
-uv run ruff check --fix .
-```
-
-## Contributing
-
-### Development Workflow
-
-1. **Make your changes**
-2. **Run checks locally** (recommended before committing):
-   ```bash
-   make ci-local     # Run the same checks as CI
-   # OR
-   make pre-commit   # Fix formatting, lint, and test
-   ```
-3. **Commit and push** your changes
-4. **Create a Pull Request**
-
-The CI will automatically run when you create or update a PR and will check:
-- ✅ Code formatting (ruff format)
-- ✅ Linting (ruff check) 
-- ✅ Tests (pytest)
-- ✅ Package builds correctly
-- ✅ CLI functionality works
 
 ### Makefile Commands
 
 ```bash
-make help         # Show all available commands
-make install-dev  # Install development dependencies
-make lint-fix     # Fix linting issues automatically
-make format       # Format code
-make test         # Run tests
-make check        # Run all checks (lint + format + test)
-make build        # Build package for distribution
-make ci-local     # Run same checks as GitHub Actions
-make pre-commit   # Quick check before committing
+make help           # Show available commands
+make test           # Run tests
+make check          # Run all checks (lint + format + test)
+make generate-test-outputs  # Regenerate test outputs
 ```
 
-### GitHub Actions
+## Use Cases
 
-This project uses GitHub Actions for CI/CD:
+- **Configuration Export**: Extract configuration dictionaries from Python files to JSON for other tools
+- **Data Migration**: Convert Python data structures to JSON for database seeding or API payloads
+- **Documentation**: Generate JSON schemas or API documentation from Python configuration files
+- **Multi-environment Config**: Export environment-specific configurations from Python modules
 
-- **PR Validation** (`pr-validation.yml`) - Runs on every PR with detailed feedback
-- **Required Checks** (`required-checks.yml`) - Must pass before merging
-- **CI** (`ci.yml`) - Comprehensive testing across Python versions
+## What gets extracted?
 
-To set up required status checks in your repository:
-1. Go to Settings → Branches → Add rule for your main branch  
-2. Enable "Require status checks to pass before merging"
-3. Select "Required Checks (Lint + Test)" as a required check
+✅ **Extracted:**
+- Public dictionary variables (not starting with `_`)
+- Nested dictionaries and complex data structures
+- All standard JSON-compatible Python data types
 
-1. Make sure your code follows the project's coding standards
-2. Run tests before submitting changes  
-3. Update documentation as needed
+❌ **Ignored:**
+- Private variables (`_private`, `__internal`)
+- Non-dictionary variables (strings, numbers, lists, etc.)
+- Functions and classes
+- Import statements
 
-### Adding Additional Services
+---
 
-The Docker Compose setup supports adding additional services for development. To add services like Redis or PostgreSQL:
-
-1. Edit `.devcontainer/docker-compose.yml`
-2. Uncomment the desired services
-3. Rebuild the dev container: `Ctrl+Shift+P` → "Dev Containers: Rebuild Container"
-
-Example services included:
-- **Redis** for caching and queues
-- **PostgreSQL** for database development
-
-### Manual Docker Compose Usage
-
-You can also run the development environment manually:
-
-```bash
-# Start the development environment
-cd .devcontainer
-docker-compose up -d
-
-# Connect to the container
-docker-compose exec app bash
-
-# Stop the environment
-docker-compose down
-```
+Built with ❤️ using [UV](https://github.com/astral-sh/uv) package manager.
