@@ -20,7 +20,7 @@ def test_process_command_comprehensive():
   Make sure that you've run `make generate-test-outputs` to create the expected outputs.
   """
   runner = CliRunner()
-  test_inputs_dir = Path(__file__).parent / "inputs"
+  test_inputs_dir = Path(__file__).parent / "inputs_basic"
   expected_outputs_dir = Path(__file__).parent / "outputs"
 
   with runner.isolated_filesystem():

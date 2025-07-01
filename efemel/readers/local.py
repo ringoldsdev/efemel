@@ -46,4 +46,7 @@ class LocalReader:
       raise Exception(f"No files found matching pattern: {glob_pattern}")
 
     for file_path in matching_files:
+      # Ignore __init__.py files
+      if "__init__.py" in file_path:
+        continue
       yield Path(file_path)
