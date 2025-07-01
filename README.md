@@ -4,7 +4,7 @@ A Python CLI application built with UV package manager.
 
 ## Development Setup
 
-This project uses VS Code Development Containers for a consistent development environment and UV for fast Python package management.
+This project uses VS Code Development Containers with Docker Compose for a consistent development environment and UV for fast Python package management.
 
 ### Prerequisites
 
@@ -17,14 +17,24 @@ This project uses VS Code Development Containers for a consistent development en
 1. Clone this repository
 2. Open the project in VS Code
 3. When prompted, click "Reopen in Container" or use the Command Palette (Ctrl+Shift+P) and select "Dev Containers: Reopen in Container"
-4. VS Code will build the development container, install UV, and set up the virtual environment with dependencies
+4. VS Code will build the development container using Docker Compose, install UV, and set up the virtual environment with dependencies
+
+### Development Container Features
+
+- **Python 3.12** with UV package manager
+- **Docker Compose** setup for scalable development environment
+- **Persistent UV cache** for faster dependency installation
+- **Pre-configured VS Code extensions** (Python, Ruff, Jupyter)
+- **GitHub CLI** for seamless Git operations
+- **Ready for additional services** (Redis, PostgreSQL) when needed
 
 ### Project Structure
 
 ```
 efemel/
 ├── .devcontainer/
-│   └── devcontainer.json    # Dev container configuration
+│   ├── devcontainer.json    # Dev container configuration
+│   └── docker-compose.yml   # Docker Compose services
 ├── efemel/                  # Main package directory
 │   ├── __init__.py         # Package initialization
 │   ├── main.py             # Main application logic
@@ -171,3 +181,31 @@ To set up required status checks in your repository:
 1. Make sure your code follows the project's coding standards
 2. Run tests before submitting changes  
 3. Update documentation as needed
+
+### Adding Additional Services
+
+The Docker Compose setup supports adding additional services for development. To add services like Redis or PostgreSQL:
+
+1. Edit `.devcontainer/docker-compose.yml`
+2. Uncomment the desired services
+3. Rebuild the dev container: `Ctrl+Shift+P` → "Dev Containers: Rebuild Container"
+
+Example services included:
+- **Redis** for caching and queues
+- **PostgreSQL** for database development
+
+### Manual Docker Compose Usage
+
+You can also run the development environment manually:
+
+```bash
+# Start the development environment
+cd .devcontainer
+docker-compose up -d
+
+# Connect to the container
+docker-compose exec app bash
+
+# Stop the environment
+docker-compose down
+```
