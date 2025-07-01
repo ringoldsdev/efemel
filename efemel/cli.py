@@ -30,10 +30,11 @@ def info():
 @cli.command()
 @click.argument("file_pattern")
 @click.option("--out", "-o", required=True, help="Output directory for JSON files")
+@click.option("--env", "-e", help="Environment for processing (default: none)")
 @click.option(
   "--cwd", "-c", help="Working directory to search for files (default: current)"
 )
-def process(file_pattern, out, cwd):
+def process(file_pattern, out, cwd, env):
   """Process Python files and extract public dictionary variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
@@ -44,7 +45,7 @@ def process(file_pattern, out, cwd):
   writer = LocalWriter(out, reader.original_cwd)
 
   for file_path in reader.read(file_pattern):
-    public_dicts = process_py_file(file_path)
+    public_dicts = process_py_file(file_path, env)
 
     if not public_dicts:
       click.echo(f"ℹ️  No public dictionaries found in {file_path}")

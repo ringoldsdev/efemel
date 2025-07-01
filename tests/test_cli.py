@@ -18,21 +18,29 @@ def get_files(expected_outputs_dir: Path, glob_pattern: str = "**/*.json"):
 def get_test_scenarios():
   """Get all available test scenarios based on input/output folder pairs."""
   test_dir = Path(__file__).parent
-  scenarios = []
 
-  # Find all input directories
-  for input_dir in test_dir.glob("inputs_*"):
-    scenario_name = input_dir.name.replace("inputs_", "")
-    output_dir = test_dir / f"outputs_{scenario_name}"
+  return [
+    (
+      "basic",
+      test_dir / "inputs_basic",
+      test_dir / "outputs_basic",
+      ["process", "**/*.py", "--out", "output"],
+    ),
+    (
+      "env",
+      test_dir / "inputs_with_imports",
+      test_dir / "outputs_with_imports",
+      ["process", "**/*.py", "--out", "output", "--env", "prod"],
+    ),
+  ]
 
-    if output_dir.exists():
-      scenarios.append((scenario_name, input_dir, output_dir))
 
-  return scenarios
-
-
-@pytest.mark.parametrize("scenario_name,inputs_dir,outputs_dir", get_test_scenarios())
-def test_process_command_comprehensive(scenario_name, inputs_dir, outputs_dir):
+@pytest.mark.parametrize(
+  "scenario_name,inputs_dir,outputs_dir,process_args", get_test_scenarios()
+)
+def test_process_command_comprehensive(
+  scenario_name, inputs_dir, outputs_dir, process_args
+):
   """
   Test the process command with all input files and compare to expected outputs.
   This test runs for each input/output folder pair found in the tests directory.
@@ -54,7 +62,7 @@ def test_process_command_comprehensive(scenario_name, inputs_dir, outputs_dir):
       shutil.copy(py_file, target_path)
 
     # Run the process command on all Python files recursively
-    result = runner.invoke(cli, ["process", "**/*.py", "--out", "output"])
+    result = runner.invoke(cli, process_args)
     assert result.exit_code == 0, (
       f"Command failed for scenario '{scenario_name}' with output: {result.output}"
     )

@@ -58,7 +58,7 @@ generate-test-outputs:
 
 	@rm -rf tests/outputs_with_imports
 	@mkdir -p tests/outputs_with_imports
-	@uv run efemel process "*.py" --cwd tests/inputs_with_imports --out tests/outputs_with_imports
+	@uv run efemel process "*.py" --cwd tests/inputs_with_imports --out tests/outputs_with_imports --env prod
 
 
 # Clean build artifacts and cache files

@@ -1,5 +1,6 @@
 {
   "main": {
-    "message": "Hello world"
+    "message": "Hello world",
+    "env": "prod"
   }
 }
