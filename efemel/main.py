@@ -2,10 +2,11 @@
 Main module for the efemel project.
 """
 
+
 def hello_world():
     """
     Simple hello world function.
-    
+
     Returns:
         str: A greeting message
     """

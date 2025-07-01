@@ -2,7 +2,6 @@
 Tests for the main module.
 """
 
-import pytest
 from efemel.main import hello_world
 
 
