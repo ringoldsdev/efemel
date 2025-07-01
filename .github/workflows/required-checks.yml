@@ -1,0 +1,40 @@
+name: Required Checks
+
+on:
+  pull_request:
+    branches:
+      - "*"
+  workflow_dispatch:  # Allow manual trigger
+
+
+jobs:
+  required-checks:
+    name: Required Checks (Lint + Test)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Setup Python
+      run: uv python install 3.12
+
+    - name: Install dependencies
+      run: make install-dev
+
+    - name: Lint check
+      id: lint
+      run: make lint
+
+    - name: Format check
+      id: format
+      run: make format-check
+
+    - name: Test
+      id: test
+      run: make test

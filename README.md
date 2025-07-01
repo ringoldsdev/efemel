@@ -122,6 +122,52 @@ uv run ruff check --fix .
 
 ## Contributing
 
+### Development Workflow
+
+1. **Make your changes**
+2. **Run checks locally** (recommended before committing):
+   ```bash
+   make ci-local     # Run the same checks as CI
+   # OR
+   make pre-commit   # Fix formatting, lint, and test
+   ```
+3. **Commit and push** your changes
+4. **Create a Pull Request**
+
+The CI will automatically run when you create or update a PR and will check:
+- ✅ Code formatting (ruff format)
+- ✅ Linting (ruff check) 
+- ✅ Tests (pytest)
+- ✅ Package builds correctly
+- ✅ CLI functionality works
+
+### Makefile Commands
+
+```bash
+make help         # Show all available commands
+make install-dev  # Install development dependencies
+make lint-fix     # Fix linting issues automatically
+make format       # Format code
+make test         # Run tests
+make check        # Run all checks (lint + format + test)
+make build        # Build package for distribution
+make ci-local     # Run same checks as GitHub Actions
+make pre-commit   # Quick check before committing
+```
+
+### GitHub Actions
+
+This project uses GitHub Actions for CI/CD:
+
+- **PR Validation** (`pr-validation.yml`) - Runs on every PR with detailed feedback
+- **Required Checks** (`required-checks.yml`) - Must pass before merging
+- **CI** (`ci.yml`) - Comprehensive testing across Python versions
+
+To set up required status checks in your repository:
+1. Go to Settings → Branches → Add rule for your main branch  
+2. Enable "Require status checks to pass before merging"
+3. Select "Required Checks (Lint + Test)" as a required check
+
 1. Make sure your code follows the project's coding standards
-2. Run tests before submitting changes
+2. Run tests before submitting changes  
 3. Update documentation as needed
