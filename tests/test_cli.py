@@ -123,7 +123,6 @@ def test_config_show_command_with_key():
 def test_config_set_command():
     """Test the config set command."""
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["config", "set", "--key", "test", "--value", "value"])
+    result = runner.invoke(cli, ["config", "set", "--key", "test", "--value", "value"])
     assert result.exit_code == 0
     assert "Setting test = value" in result.output
