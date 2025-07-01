@@ -14,7 +14,9 @@ requires-python = ">=3.12"
 authors = [
     {name = "Your Name", email = "your.email@example.com"},
 ]
-dependencies = []
+dependencies = [
+    "click>=8.0.0",
+]
 
 [project.scripts]
 efemel = "efemel.cli:main"
