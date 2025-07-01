@@ -4,7 +4,6 @@ CLI entry point for efemel.
 
 import click
 
-from efemel.main import hello_world
 from efemel.process import process_py_file
 from efemel.readers.local import LocalReader
 from efemel.transformers.json import JSONTransformer
@@ -18,12 +17,6 @@ def cli(ctx):
   """Efemel CLI application."""
   # Ensure that ctx.obj exists and is a dict (in case `cli()` is called by scripts)
   ctx.ensure_object(dict)
-
-
-@cli.command()
-def hello():
-  """Print hello world message."""
-  click.echo(hello_world())
 
 
 @cli.command()
