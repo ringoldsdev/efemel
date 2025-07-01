@@ -8,24 +8,17 @@ config = {
     "name": "test_app",
     "version": "1.0.0",
     "debug": True,
-    "features": ["auth", "api", "ui"]
+    "features": ["auth", "api", "ui"],
 }
 
 settings = {
-    "database": {
-        "host": "localhost",
-        "port": 5432,
-        "name": "app_db"
-    },
-    "cache": {
-        "type": "redis",
-        "ttl": 3600
-    }
+    "database": {"host": "localhost", "port": 5432, "name": "app_db"},
+    "cache": {"type": "redis", "ttl": 3600},
 }
 
 user_data = {
     "admin": {"name": "Admin User", "role": "admin"},
-    "guest": {"name": "Guest User", "role": "guest"}
+    "guest": {"name": "Guest User", "role": "guest"},
 }
 
 # Private variables (should be ignored)
@@ -45,4 +38,5 @@ def some_function():
 
 class SomeClass:
     """A class that should be ignored."""
+
     pass

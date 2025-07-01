@@ -31,66 +31,9 @@ def info():
 
 
 @cli.command()
-@click.option("--name", "-n", default="World", help="Name to greet")
-@click.option("--count", "-c", default=1, help="Number of greetings")
-@click.option("--loud", is_flag=True, help="Shout the greeting")
-def greet(name, count, loud):
-    """Greet someone with customizable options."""
-    for _ in range(count):
-        greeting = f"Hello, {name}!"
-        if loud:
-            greeting = greeting.upper()
-        click.echo(greeting)
-
-
-@cli.command()
-@click.argument("text")
-@click.option("--reverse", is_flag=True, help="Reverse the text")
-@click.option("--upper", is_flag=True, help="Convert to uppercase")
-@click.option("--lower", is_flag=True, help="Convert to lowercase")
-def echo(text, reverse, upper, lower):
-    """Echo text with optional transformations."""
-    result = text
-
-    if reverse:
-        result = result[::-1]
-    if upper:
-        result = result.upper()
-    elif lower:  # Only apply lower if upper is not set
-        result = result.lower()
-
-    click.echo(result)
-
-
-@cli.group()
-def config():
-    """Configuration management commands."""
-    pass
-
-
-@config.command()
-@click.option("--key", required=True, help="Configuration key")
-@click.option("--value", required=True, help="Configuration value")
-def set(key, value):
-    """Set a configuration value."""
-    click.echo(f"Setting {key} = {value}")
-    # In a real app, this would save to a config file
-
-
-@config.command()
-@click.option('--key', help='Specific configuration key to show')
-def show(key):
-    """Show configuration values."""
-    if key:
-        click.echo(f"Configuration for '{key}': <not implemented>")
-    else:
-        click.echo("All configuration values: <not implemented>")
-
-
-@cli.command()
-@click.argument('file_pattern')
-@click.option('--out', '-o', required=True, help='Output directory for JSON files')
-@click.option('--verbose', '-v', is_flag=True, help='Verbose output')
+@click.argument("file_pattern")
+@click.option("--out", "-o", required=True, help="Output directory for JSON files")
+@click.option("--verbose", "-v", is_flag=True, help="Verbose output")
 def process(file_pattern, out, verbose):
     """Process Python files and extract public dictionary variables to JSON.
 
@@ -99,8 +42,8 @@ def process(file_pattern, out, verbose):
     import importlib.util
     import json
     import sys
-    from pathlib import Path
     from glob import glob
+    from pathlib import Path
 
     output_dir = Path(out)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -111,7 +54,7 @@ def process(file_pattern, out, verbose):
 
     # Find matching files
     matching_files = glob(file_pattern, recursive=True)
-    python_files = [f for f in matching_files if f.endswith('.py')]
+    python_files = [f for f in matching_files if f.endswith(".py")]
 
     if not python_files:
         click.echo(f"No Python files found matching pattern: {file_pattern}")
@@ -133,19 +76,17 @@ def process(file_pattern, out, verbose):
 
             # Create output path maintaining directory structure
             # Remove .py extension and add .json
-            relative_path = py_file.with_suffix('.json')
+            relative_path = py_file.with_suffix(".json")
             output_file = output_dir / relative_path
 
             # Ensure output directory exists
             output_file.parent.mkdir(parents=True, exist_ok=True)
 
             # Load the module dynamically
-            spec = importlib.util.spec_from_file_location(
-                "dynamic_module", py_file)
+            spec = importlib.util.spec_from_file_location("dynamic_module", py_file)
             if spec is None or spec.loader is None:
                 if verbose:
-                    click.echo(
-                        f"  ⚠️  Could not create module spec for {file_path}")
+                    click.echo(f"  ⚠️  Could not create module spec for {file_path}")
                 error_count += 1
                 continue
 
@@ -171,7 +112,7 @@ def process(file_pattern, out, verbose):
 
             for attr_name in dir(module):
                 # Skip private/protected attributes (starting with _)
-                if attr_name.startswith('_'):
+                if attr_name.startswith("_"):
                     continue
 
                 try:
@@ -188,37 +129,28 @@ def process(file_pattern, out, verbose):
 
                 except Exception as e:
                     if verbose:
-                        click.echo(
-                            f"  ⚠️  Could not access attribute {attr_name}: {e}")
+                        click.echo(f"  ⚠️  Could not access attribute {attr_name}: {e}")
                     continue
-              # Write to JSON file
+            # Write to JSON file
             if public_dicts:
                 try:
-                    with open(output_file, 'w', encoding='utf-8') as f:
+                    with open(output_file, "w", encoding="utf-8") as f:
                         json.dump(
-                            public_dicts,
-                            f,
-                            indent=2,
-                            ensure_ascii=False,
-                            default=str
+                            public_dicts, f, indent=2, ensure_ascii=False, default=str
                         )
 
                     if verbose:
                         dict_count = len(public_dicts)
-                        click.echo(
-                            f"  ✅ Saved {dict_count} dict(s) to: {output_file}"
-                        )
+                        click.echo(f"  ✅ Saved {dict_count} dict(s) to: {output_file}")
 
                     processed_count += 1
 
                 except Exception as e:
-                    click.echo(
-                        f"  ❌ Error writing JSON file {output_file}: {e}")
+                    click.echo(f"  ❌ Error writing JSON file {output_file}: {e}")
                     error_count += 1
             else:
                 if verbose:
-                    click.echo(
-                        f"  ℹ️  No public dictionaries found in {file_path}")
+                    click.echo(f"  ℹ️  No public dictionaries found in {file_path}")
 
         except Exception as e:
             click.echo(f"❌ Error processing {file_path}: {e}")

@@ -17,7 +17,6 @@ help:
 	@echo "  info         - Show package information"
 	@echo "  run          - Show CLI help"
 	@echo "  run-hello    - Run hello command"
-	@echo "  demo         - Demonstrate CLI features"
 
 # Install the package in editable mode
 install:
@@ -86,18 +85,3 @@ run:
 # Run the CLI application with hello command
 run-hello:
 	uv run efemel hello
-
-# Demo CLI commands
-demo:
-	@echo "🚀 Demonstrating efemel CLI commands..."
-	@echo "▶️ Basic hello:"
-	uv run efemel hello
-	@echo ""
-	@echo "▶️ Custom greet:"
-	uv run efemel greet --name "Developer" --count 2
-	@echo ""
-	@echo "▶️ Echo with transformations:"
-	uv run efemel echo "Hello Click!" --reverse --upper
-	@echo ""
-	@echo "▶️ Package info:"
-	uv run efemel info
