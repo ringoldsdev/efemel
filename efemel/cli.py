@@ -74,10 +74,10 @@ def process(file_pattern, out, verbose):
       # Convert to Path object for easier manipulation
       py_file = Path(file_path)
 
-      # Create output path maintaining directory structure
+      # Create output path using just the filename
       # Remove .py extension and add .json
-      relative_path = py_file.with_suffix(".json")
-      output_file = output_dir / relative_path
+      output_filename = py_file.stem + ".json"
+      output_file = output_dir / output_filename
 
       # Ensure output directory exists
       output_file.parent.mkdir(parents=True, exist_ok=True)
