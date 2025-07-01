@@ -63,6 +63,11 @@ def process(file_pattern, out, verbose):
   if verbose:
     click.echo(f"Found {len(python_files)} Python files to process")
 
+  # Determine if we should preserve directory structure
+  # If there's only one file and no glob patterns, use just filename
+  # Otherwise, preserve relative directory structure
+  preserve_structure = len(python_files) > 1 or "*" in file_pattern
+
   processed_count = 0
   error_count = 0
 
@@ -74,10 +79,15 @@ def process(file_pattern, out, verbose):
       # Convert to Path object for easier manipulation
       py_file = Path(file_path)
 
-      # Create output path using just the filename
-      # Remove .py extension and add .json
-      output_filename = py_file.stem + ".json"
-      output_file = output_dir / output_filename
+      # Create output path
+      if preserve_structure:
+        # Preserve directory structure relative to current working directory
+        relative_path = py_file.with_suffix(".json")
+        output_file = output_dir / relative_path
+      else:
+        # Use just the filename
+        output_filename = py_file.stem + ".json"
+        output_file = output_dir / output_filename
 
       # Ensure output directory exists
       output_file.parent.mkdir(parents=True, exist_ok=True)

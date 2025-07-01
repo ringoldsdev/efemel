@@ -114,3 +114,116 @@ def test_process_command_with_test_inputs():
 
     # Should contain the public dicts from test_data.py
     assert len(data) > 0  # Should have found some dictionaries
+
+
+def test_process_command_entire_folder():
+  """Test the process command with an entire folder."""
+  runner = CliRunner()
+
+  with runner.isolated_filesystem():
+    # Create a test directory structure with multiple Python files
+    os.makedirs("test_project/subdir", exist_ok=True)
+
+    # Create first test file
+    with open("test_project/config.py", "w") as f:
+      f.write(
+        """
+# Configuration file
+app_config = {
+    "name": "test_app",
+    "version": "2.0.0",
+    "environment": "development"
+}
+
+database_config = {
+    "host": "localhost",
+    "port": 3306,
+    "name": "test_db"
+}
+
+# Private config (should be ignored)
+_internal_config = {"secret_key": "abc123"}
+"""
+      )
+
+    # Create second test file in subdirectory
+    with open("test_project/subdir/settings.py", "w") as f:
+      f.write(
+        """
+# Settings file
+user_settings = {
+    "theme": "dark",
+    "language": "en",
+    "notifications": True
+}
+
+api_settings = {
+    "timeout": 30,
+    "retries": 3,
+    "base_url": "https://api.example.com"
+}
+
+# Non-dict variable (should be ignored)
+DEBUG_MODE = True
+"""
+      )
+
+    # Create third test file with no dictionaries
+    with open("test_project/utils.py", "w") as f:
+      f.write(
+        """
+# Utility functions (no dictionaries)
+def helper_function():
+    return "helper"
+
+class UtilityClass:
+    pass
+
+CONSTANT_VALUE = 42
+"""
+      )
+
+    # Run the process command on the entire folder using glob pattern
+    result = runner.invoke(
+      cli, ["process", "test_project/**/*.py", "--out", "output", "--verbose"]
+    )
+    assert result.exit_code == 0, f"Command failed with output: {result.output}"
+    assert "Successfully processed: 2 files" in result.output  # Only files with dicts
+
+    # Debug: print what files were actually created
+    print("\\nFiles created:")
+    for root, _dirs, files in os.walk("output"):
+      for file in files:
+        print(f"  {os.path.join(root, file)}")
+
+    # Check that output files were created for files with dictionaries
+    # Should preserve directory structure
+    expected_config = "output/test_project/config.json"
+    expected_settings = "output/test_project/subdir/settings.json"
+    expected_utils = "output/test_project/utils.json"
+
+    assert os.path.exists(expected_config), f"Expected file {expected_config} not found"
+    assert os.path.exists(expected_settings), (
+      f"Expected file {expected_settings} not found"
+    )
+    # utils.py should not create an output file since it has no dictionaries
+    assert not os.path.exists(expected_utils), f"Unexpected file {expected_utils} found"
+
+    # Check the content of config.json
+    with open(expected_config) as f:
+      config_data = json.load(f)
+
+    assert "app_config" in config_data
+    assert "database_config" in config_data
+    assert "_internal_config" not in config_data  # Should be filtered out
+    assert config_data["app_config"]["name"] == "test_app"
+    assert config_data["database_config"]["port"] == 3306
+
+    # Check the content of settings.json
+    with open(expected_settings) as f:
+      settings_data = json.load(f)
+
+    assert "user_settings" in settings_data
+    assert "api_settings" in settings_data
+    assert settings_data["user_settings"]["theme"] == "dark"
+    assert settings_data["api_settings"]["timeout"] == 30
