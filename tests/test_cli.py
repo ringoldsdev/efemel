@@ -7,6 +7,13 @@ from click.testing import CliRunner
 from efemel.cli import cli
 
 
+def get_files(expected_outputs_dir: Path, glob_pattern: str = "**/*.json"):
+  return [
+    str(json_file.relative_to(expected_outputs_dir))
+    for json_file in expected_outputs_dir.glob(glob_pattern)
+  ]
+
+
 def test_process_command_comprehensive():
   """
   Test the process command with all input files and compare to expected outputs.
@@ -33,20 +40,8 @@ def test_process_command_comprehensive():
     result = runner.invoke(cli, ["process", "**/*.py", "--out", "output"])
     assert result.exit_code == 0, f"Command failed with output: {result.output}"
 
-    # Collect all generated output files
-    generated_files = []
-    for json_file in Path("output").glob("**/*.json"):
-      rel_path = json_file.relative_to("output")
-      generated_files.append(str(rel_path))
-
-    # Collect all expected output files
-    expected_files = []
-    for json_file in expected_outputs_dir.glob("**/*.json"):
-      rel_path = json_file.relative_to(expected_outputs_dir)
-      expected_files.append(str(rel_path))
-
     # Compare content of each file
-    for file_path in expected_files:
+    for file_path in get_files(expected_outputs_dir):
       generated_file = Path("output") / file_path
       expected_file = expected_outputs_dir / file_path
 
