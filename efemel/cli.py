@@ -1,8 +1,11 @@
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path  # Import Path for file_path operations
 
 import click
 
+# Import the new hooks manager
+from efemel import hooks_manager  # Assuming hooks_manager.py is in the same directory or importable
 from efemel.process import process_py_file
 from efemel.readers.local import LocalReader
 from efemel.transformers.json import JSONTransformer
@@ -39,7 +42,13 @@ def info():
   default=DEFAULT_WORKERS,
   help=f"Number of parallel workers (default: {DEFAULT_WORKERS})",
 )
-def process(file_pattern, out, cwd, env, workers):
+@click.option(
+  "--hooks-file",
+  "-H",
+  type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
+  help="Path to a Python file containing user-defined hooks.",
+)
+def process(file_pattern, out, cwd, env, workers, hooks_file):
   """Process Python files and extract public dictionary variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
@@ -49,6 +58,12 @@ def process(file_pattern, out, cwd, env, workers):
   transformer = JSONTransformer()
   writer = LocalWriter(out, reader.original_cwd)
 
+  # Load user-defined hooks if a file is specified
+  if hooks_file:
+    print(f"Loading hooks from: {hooks_file}")
+    hooks_manager.load_user_hooks_file(hooks_file)
+    print("Hooks loaded.")
+
   # Collect all files to process
   files_to_process = list(reader.read(file_pattern))
 
@@ -56,17 +71,36 @@ def process(file_pattern, out, cwd, env, workers):
     click.echo("No files found matching the pattern.")
     return
 
-  def process_single_file(file_path):
+  def process_single_file(file_path: Path):  # Added type hint for clarity
     """Process a single file and return results."""
     try:
       # Always create output file, even if no dictionaries found
       public_dicts = process_py_file(file_path, env) or {}
       transformed_data = transformer.transform(public_dicts)
-      output_file = writer.write(transformed_data, file_path.with_suffix(transformer.suffix))
+
+      # Original proposed output filename (as a Path object for consistency)
+      proposed_output_path = file_path.with_suffix(transformer.suffix)
+
+      # --- HOOK POINT: modify_output_filename ---
+      # Call the hook chain to allow modification of the output filename.
+      # The hook receives the proposed Path object, the original input file_path,
+      # and the 'next_hook' callable.
+      final_output_path = hooks_manager.call_hook(
+        "output_filename",
+        proposed_output_path,
+        original_input_file_path=file_path,  # Pass original input file path as context
+      )
+      # Ensure the hook returns a Path object, or convert if it returns a string
+      if not isinstance(final_output_path, Path):
+        final_output_path = Path(final_output_path)
+      # --- END HOOK POINT ---
+
+      output_file = writer.write(transformed_data, final_output_path)
 
       return file_path, output_file, f"Processed: {reader.cwd / file_path} → {output_file}"
 
     except Exception as e:
+      # Ensure the exception message is clear about which file caused the error
       raise Exception(f"Error processing {file_path}: {str(e)}") from e
 
   # Process files in parallel
@@ -78,10 +112,13 @@ def process(file_pattern, out, cwd, env, workers):
     # Process completed tasks as they finish
     processed_count = 0
     for future in as_completed(future_to_file):
-      file_path, output_file, message = future.result()
-      click.echo(message)
-      if output_file:
-        processed_count += 1
+      try:
+        file_path, output_file, message = future.result()
+        click.echo(message)
+        if output_file:
+          processed_count += 1
+      except Exception as e:
+        click.echo(f"❌ {e}")  # Print errors from individual file processing
 
   click.echo(f"✅ Completed processing {processed_count}/{len(files_to_process)} files.")
 
