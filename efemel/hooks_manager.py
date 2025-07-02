@@ -37,21 +37,24 @@ def load_user_hooks_file(file_path: str):
     print(f"Successfully loaded hooks module: {module_name} from {file_path}")
 
     # Look for a 'hooks' dictionary in the loaded module
-    if hasattr(module, "hooks") and isinstance(module.hooks, dict):
-      for hook_name, hook_funcs in module.hooks.items():
-        if isinstance(hook_funcs, list):
-          # Ensure all items in the list are callable
-          valid_funcs = [f for f in hook_funcs if callable(f)]
-          if len(valid_funcs) != len(hook_funcs):
-            print(f"Warning: Some items in hook '{hook_name}' are not callable and will be ignored.")
-          if hook_name not in HOOKS:
-            HOOKS[hook_name] = []
-          HOOKS[hook_name].extend(valid_funcs)
-          print(f"Registered {len(valid_funcs)} functions for hook '{hook_name}' from user file.")
-        else:
-          print(f"Warning: Value for hook '{hook_name}' in user_hooks.py is not a list of functions. Ignoring.")
-    else:
+    if not hasattr(module, "hooks") or not isinstance(module.hooks, dict):
       print(f"Warning: No 'hooks' dictionary found in '{file_path}'. No hooks registered.")
+      return
+
+    for hook_name, hook_funcs in module.hooks.items():
+      if not isinstance(hook_funcs, list):
+        print(f"Warning: Value for hook '{hook_name}' in user_hooks.py is not a list of functions. Ignoring.")
+        continue
+
+      # Ensure all items in the list are callable
+      valid_funcs = [f for f in hook_funcs if callable(f)]
+      if len(valid_funcs) != len(hook_funcs):
+        print(f"Warning: Some items in hook '{hook_name}' are not callable and will be ignored.")
+
+      if hook_name not in HOOKS:
+        HOOKS[hook_name] = []
+      HOOKS[hook_name].extend(valid_funcs)
+      print(f"Registered {len(valid_funcs)} functions for hook '{hook_name}' from user file.")
 
   except Exception as e:
     print(f"Error loading hooks from {file_path}: {e}")
