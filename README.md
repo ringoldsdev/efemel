@@ -68,11 +68,14 @@ pip install .
 # Process a single file
 efemel process config.py --out output
 
-# Process multiple files with glob patterns
+# Process multiple files with glob patterns (uses all CPU cores by default)
 efemel process "src/**/*.py" --out exports
 
 # Process files relative to a specific directory
 efemel process "**/*.py" --cwd /path/to/project --out output
+
+# Control parallelism with --workers option
+efemel process "**/*.py" --out output --workers 2
 ```
 
 ### Real-world Example
@@ -170,17 +173,18 @@ Extract dictionary variables from Python files.
 - `--out OUTPUT_DIR` - Directory to write JSON files (required)
 - `--cwd DIRECTORY` - Working directory for file operations (optional)
 - `--env ENVIRONMENT` - Environment for dynamic imports (e.g., `prod`, `staging`) (optional)
+- `--workers NUMBER` - Number of parallel workers (default: CPU thread count) (optional)
 
 **Examples:**
 ```bash
 # Single file
 efemel process config.py --out output
 
-# All Python files recursively
+# All Python files recursively (uses all CPU cores)
 efemel process "**/*.py" --out output
 
-# Files in specific directory
-efemel process "src/config/*.py" --out exported
+# Files in specific directory with 2 workers
+efemel process "src/config/*.py" --out exported --workers 2
 
 # Process relative to different directory
 efemel process "*.py" --cwd /path/to/configs --out output
@@ -188,8 +192,8 @@ efemel process "*.py" --cwd /path/to/configs --out output
 # Process with production environment
 efemel process "config/**/*.py" --out output --env prod
 
-# Process with staging environment and custom working directory
-efemel process "**/*.py" --cwd /app/configs --out exports --env staging
+# Process with staging environment and custom working directory (single-threaded)
+efemel process "**/*.py" --cwd /app/configs --out exports --env staging --workers 1
 ```
 
 ### `efemel info`
