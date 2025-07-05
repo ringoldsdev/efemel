@@ -4,9 +4,10 @@ from pathlib import Path  # Import Path for file_path operations
 
 import click
 
-# Import the new hooks manager
-from efemel import hooks_manager  # Assuming hooks_manager.py is in the same directory or importable
 from efemel.hooks.output_filename import ensure_output_path, flatten_output_path
+
+# Import the new hooks manager
+from efemel.hooks_manager import hooks_manager  # Import the global instance
 from efemel.process import process_py_file
 from efemel.readers.local import LocalReader
 from efemel.transformers.json import JSONTransformer
@@ -62,15 +63,14 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks_file):
 
   if flatten:
     # Add the flatten_output_path hook to the hooks manager
-    hooks_manager.add_hook("output_filename", flatten_output_path)
+    hooks_manager.add("output_filename", flatten_output_path)
 
   # Load user-defined hooks if a file is specified
   if hooks_file:
-    print(f"Loading hooks from: {hooks_file}")
-    hooks_manager.load_user_hooks_file(hooks_file)
-    print("User hooks loaded.")
+    hooks_manager.load_user_file(hooks_file)
+    click.echo(f"User hooks loaded from: {hooks_file}")
 
-  hooks_manager.add_hook("output_filename", ensure_output_path)
+  hooks_manager.add("output_filename", ensure_output_path)
 
   # Collect all files to process
   files_to_process = list(reader.read(file_pattern))
@@ -89,7 +89,7 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks_file):
       # Original proposed output filename (as a Path object for consistency)
       proposed_output_path = file_path.with_suffix(transformer.suffix)
 
-      (output_file_path,) = hooks_manager.call_hook(
+      (output_file_path,) = hooks_manager.call(
         "output_filename",
         {
           "input_file_path": file_path,
