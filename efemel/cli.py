@@ -47,7 +47,7 @@ def info():
 )
 @click.option(
   "--hooks-file",
-  "-H",
+  "-h",
   type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
   help="Path to a Python file containing user-defined hooks.",
 )

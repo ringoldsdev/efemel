@@ -61,6 +61,9 @@ generate-test-outputs:
 	@rm -rf tests/outputs_basic_flattened
 	@uv run efemel process "**/*.py" --cwd tests/inputs_basic --out tests/outputs_basic_flattened --flatten
 
+	@rm -rf tests/outputs_basic_with_hooks
+	@uv run efemel process "**/*.py" --cwd tests/inputs_basic --out tests/outputs_basic_with_hooks --hooks-file tests/hooks/output_filename.py
+
 # Clean build artifacts and cache files
 clean:
 	rm -rf build/

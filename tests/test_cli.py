@@ -35,6 +35,12 @@ def get_test_scenarios():
       test_dir / "outputs_with_imports",
       ["process", "**/*.py", "--out", "output", "--env", "prod"],
     ),
+    (
+      "basic with hooks",
+      test_dir / "inputs_with_imports",
+      test_dir / "outputs_basic_with_hooks",
+      ["process", "**/*.py", "--out", "output", "--hooks-file", "hooks/output_filename.py"],
+    ),
   ]
 
 
@@ -59,6 +65,20 @@ def test_process_command_comprehensive(scenario_name, inputs_dir, outputs_dir, p
 
       # Copy the file
       shutil.copy(py_file, target_path)
+
+    # Copy all hooks files if they exist
+    hooks_dir = Path(__file__).parent / "hooks"
+    if hooks_dir.exists():
+      for hook_file in hooks_dir.glob("*.py"):
+        # Calculate relative path from hooks directory
+        rel_path = hook_file.relative_to(hooks_dir)
+        target_path = Path("hooks") / rel_path
+
+        # Create parent directories if they don't exist
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Copy the file
+        shutil.copy(hook_file, target_path)
 
     # Run the process command on all Python files recursively
     result = runner.invoke(cli, process_args)
