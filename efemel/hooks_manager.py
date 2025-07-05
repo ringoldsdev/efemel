@@ -6,8 +6,8 @@ from collections.abc import Callable
 from typing import Any
 
 # Global dictionary to store registered hook functions
-# Keys are hook names (strings), values are single functions
-HOOKS: dict[str, Callable] = {}
+# Keys are hook names (strings), values are lists of functions
+HOOKS: dict[str, list[Callable]] = {}
 
 
 def load_user_hooks_file(file_path: str):
@@ -40,7 +40,7 @@ def load_user_hooks_file(file_path: str):
       if not attr_name.startswith("_"):  # Skip private/dunder methods
         attr_value = getattr(module, attr_name)
         if callable(attr_value):
-          HOOKS[attr_name] = attr_value
+          add_hook(attr_name, attr_value)
           print(f"Registered function '{attr_name}' as hook.")
 
   except Exception as e:
@@ -49,35 +49,103 @@ def load_user_hooks_file(file_path: str):
 
 def call_hook(hook_name: str, context: dict[str, Any], return_params: list[str]) -> dict[str, Any] | tuple[Any, ...]:
   """
-  Calls a registered hook function with the provided context.
-  The hook function can mutate the context dictionary in place.
+  Calls all registered hook functions for a given hook name in sequence.
+  Each hook function can mutate the context dictionary in place.
 
   Args:
     hook_name: Name of the hook to call
-    context: Dictionary containing all data that the hook can read/modify
+    context: Dictionary containing all data that the hooks can read/modify
     return_params: List of parameter names to return. If None, returns the full context.
                   If provided, returns a tuple of the specified parameters in order.
 
   Returns:
     The context dictionary (if return_params is None) or a tuple of specified parameters
   """
-  hook_func = HOOKS.get(hook_name)
+  hook_funcs = HOOKS.get(hook_name, [])
 
-  if not hook_func:
-    # No hook registered, return unmodified context or requested parameters
+  if not hook_funcs:
+    # No hooks registered, return unmodified context or requested parameters
     if return_params is None:
       return context
     return tuple(context.get(param) for param in return_params)
 
-  try:
-    hook_func(context)
+  # Execute all hooks in sequence
+  for hook_func in hook_funcs:
+    try:
+      hook_func(context)
+    except Exception as e:
+      print(f"Error in hook '{hook_name}' (function: {getattr(hook_func, '__name__', 'unknown')}): {e}")
+      # Continue with other hooks even if one fails
 
-    # Return tuple of requested parameters
-    return tuple(context.get(param) for param in return_params)
+  # Return requested parameters
+  if return_params is None:
+    return context
+  return tuple(context.get(param) for param in return_params)
 
-  except Exception as e:
-    print(f"Error in hook '{hook_name}' (function: {getattr(hook_func, '__name__', 'unknown')}): {e}")
 
-    if return_params is None:
-      return context
-    return tuple(context.get(param) for param in return_params)
+def add_hook(hook_name: str, hook_func: Callable) -> None:
+  """
+  Manually add a hook function to the registry.
+
+  Args:
+    hook_name: Name of the hook
+    hook_func: Function to register for this hook
+  """
+  if not callable(hook_func):
+    raise ValueError(f"Hook function must be callable, got {type(hook_func)}")
+
+  if hook_name not in HOOKS:
+    HOOKS[hook_name] = []
+
+  HOOKS[hook_name].append(hook_func)
+
+
+def remove_hook(hook_name: str, hook_func: Callable | None = None) -> None:
+  """
+  Remove a hook function from the registry.
+
+  Args:
+    hook_name: Name of the hook
+    hook_func: Specific function to remove. If None, removes all hooks for this name.
+  """
+  if hook_name not in HOOKS:
+    return
+
+  if hook_func is None:
+    # Remove all hooks for this name
+    del HOOKS[hook_name]
+  else:
+    # Remove specific function
+    if hook_func in HOOKS[hook_name]:
+      HOOKS[hook_name].remove(hook_func)
+      # If no more hooks, remove the key
+      if not HOOKS[hook_name]:
+        del HOOKS[hook_name]
+
+
+def clear_hooks() -> None:
+  """Clear all registered hooks."""
+  HOOKS.clear()
+
+
+def list_hooks() -> dict[str, list[str]]:
+  """
+  List all registered hooks.
+
+  Returns:
+    Dictionary mapping hook names to lists of function names
+  """
+  return {hook_name: [getattr(func, "__name__", "unknown") for func in funcs] for hook_name, funcs in HOOKS.items()}
+
+
+def get_hook_count(hook_name: str) -> int:
+  """
+  Get the number of functions registered for a specific hook.
+
+  Args:
+    hook_name: Name of the hook
+
+  Returns:
+    Number of functions registered for this hook
+  """
+  return len(HOOKS.get(hook_name, []))

@@ -53,13 +53,13 @@ test:
 # Generate expected test outputs from test inputs
 generate-test-outputs:
 	@rm -rf tests/outputs_basic
-	@mkdir -p tests/outputs_basic
 	@uv run efemel process "**/*.py" --cwd tests/inputs_basic --out tests/outputs_basic
 
 	@rm -rf tests/outputs_with_imports
-	@mkdir -p tests/outputs_with_imports
 	@uv run efemel process "*.py" --cwd tests/inputs_with_imports --out tests/outputs_with_imports --env prod
 
+	@rm -rf tests/outputs_basic_flattened
+	@uv run efemel process "**/*.py" --cwd tests/inputs_basic --out tests/outputs_basic_flattened --flatten
 
 # Clean build artifacts and cache files
 clean:

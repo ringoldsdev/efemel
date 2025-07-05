@@ -24,6 +24,12 @@ def get_test_scenarios():
       ["process", "**/*.py", "--out", "output"],
     ),
     (
+      "basic flattened",
+      test_dir / "inputs_basic",
+      test_dir / "outputs_basic_flattened",
+      ["process", "**/*.py", "--out", "output", "--flatten"],
+    ),
+    (
       "env",
       test_dir / "inputs_with_imports",
       test_dir / "outputs_with_imports",

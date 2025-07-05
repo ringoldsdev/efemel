@@ -6,6 +6,7 @@ import click
 
 # Import the new hooks manager
 from efemel import hooks_manager  # Assuming hooks_manager.py is in the same directory or importable
+from efemel.hooks.output_filename import ensure_output_path, flatten_output_path
 from efemel.process import process_py_file
 from efemel.readers.local import LocalReader
 from efemel.transformers.json import JSONTransformer
@@ -34,6 +35,7 @@ def info():
 @cli.command()
 @click.argument("file_pattern")
 @click.option("--out", "-o", required=True, help="Output directory for JSON files")
+@click.option("--flatten", "-f", is_flag=True, default=False, help="Flatten the output file name")
 @click.option("--env", "-e", help="Environment for processing (default: none)")
 @click.option("--cwd", "-c", help="Working directory to search for files (default: current)")
 @click.option(
@@ -48,7 +50,7 @@ def info():
   type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
   help="Path to a Python file containing user-defined hooks.",
 )
-def process(file_pattern, out, cwd, env, workers, hooks_file):
+def process(file_pattern, out, flatten, cwd, env, workers, hooks_file):
   """Process Python files and extract public dictionary variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
@@ -58,11 +60,17 @@ def process(file_pattern, out, cwd, env, workers, hooks_file):
   transformer = JSONTransformer()
   writer = LocalWriter(out, reader.original_cwd)
 
+  if flatten:
+    # Add the flatten_output_path hook to the hooks manager
+    hooks_manager.add_hook("output_filename", flatten_output_path)
+
   # Load user-defined hooks if a file is specified
   if hooks_file:
     print(f"Loading hooks from: {hooks_file}")
     hooks_manager.load_user_hooks_file(hooks_file)
-    print("Hooks loaded.")
+    print("User hooks loaded.")
+
+  hooks_manager.add_hook("output_filename", ensure_output_path)
 
   # Collect all files to process
   files_to_process = list(reader.read(file_pattern))
@@ -81,23 +89,18 @@ def process(file_pattern, out, cwd, env, workers, hooks_file):
       # Original proposed output filename (as a Path object for consistency)
       proposed_output_path = file_path.with_suffix(transformer.suffix)
 
-      # --- HOOK POINT: output_filename ---
-      (final_output_path,) = hooks_manager.call_hook(
+      (output_file_path,) = hooks_manager.call_hook(
         "output_filename",
         {
           "input_file_path": file_path,
           "output_file_path": proposed_output_path,
+          "output_dir": writer.output_dir,
           "env": env,
         },
         return_params=["output_file_path"],
       )
 
-      # Ensure it's a Path object
-      if not isinstance(final_output_path, Path):
-        final_output_path = Path(final_output_path)
-      # --- END HOOK POINT ---
-
-      output_file = writer.write(transformed_data, final_output_path)
+      output_file = writer.write(transformed_data, output_file_path)
 
       return file_path, output_file, f"Processed: {reader.cwd / file_path} → {output_file}"
 
