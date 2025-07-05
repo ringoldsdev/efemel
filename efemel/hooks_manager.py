@@ -47,7 +47,7 @@ def load_user_hooks_file(file_path: str):
     print(f"Error loading hooks from {file_path}: {e}")
 
 
-def call_hook(hook_name: str, context: dict[str, Any]) -> None:
+def call_hook(hook_name: str, context: dict[str, Any], return_params: list[str]) -> dict[str, Any] | tuple[Any, ...]:
   """
   Calls a registered hook function with the provided context.
   The hook function can mutate the context dictionary in place.
@@ -55,13 +55,29 @@ def call_hook(hook_name: str, context: dict[str, Any]) -> None:
   Args:
     hook_name: Name of the hook to call
     context: Dictionary containing all data that the hook can read/modify
+    return_params: List of parameter names to return. If None, returns the full context.
+                  If provided, returns a tuple of the specified parameters in order.
+
+  Returns:
+    The context dictionary (if return_params is None) or a tuple of specified parameters
   """
   hook_func = HOOKS.get(hook_name)
 
   if not hook_func:
-    return  # No hook registered, do nothing
+    # No hook registered, return unmodified context or requested parameters
+    if return_params is None:
+      return context
+    return tuple(context.get(param) for param in return_params)
 
   try:
     hook_func(context)
+
+    # Return tuple of requested parameters
+    return tuple(context.get(param) for param in return_params)
+
   except Exception as e:
     print(f"Error in hook '{hook_name}' (function: {getattr(hook_func, '__name__', 'unknown')}): {e}")
+
+    if return_params is None:
+      return context
+    return tuple(context.get(param) for param in return_params)

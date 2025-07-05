@@ -82,20 +82,15 @@ def process(file_pattern, out, cwd, env, workers, hooks_file):
       proposed_output_path = file_path.with_suffix(transformer.suffix)
 
       # --- HOOK POINT: output_filename ---
-      # Create context for the hook to read/modify
-      context = {
-        "input_file_path": file_path,
-        "output_file_path": proposed_output_path,
-        "public_dicts": public_dicts,
-        "transformed_data": transformed_data,
-        "env": env,
-      }
-
-      # Call the hook which can modify the context in place
-      hooks_manager.call_hook("output_filename", context)
-
-      # Extract the potentially modified output path
-      final_output_path = context["output_file_path"]
+      (final_output_path,) = hooks_manager.call_hook(
+        "output_filename",
+        {
+          "input_file_path": file_path,
+          "output_file_path": proposed_output_path,
+          "env": env,
+        },
+        return_params=["output_file_path"],
+      )
 
       # Ensure it's a Path object
       if not isinstance(final_output_path, Path):
