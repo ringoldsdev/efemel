@@ -102,9 +102,4 @@ def process_py_file(input_path: Path, environment: str = "default"):
     sys.path = original_sys_path
 
   # Extract all dictionary variables from module
-  all_dicts = {}
-
-  for attr_name in module.__dict__:
-    all_dicts[attr_name] = getattr(module, attr_name)
-
-  return all_dicts
+  return module.__dict__
