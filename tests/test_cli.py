@@ -21,28 +21,24 @@ def get_test_scenarios():
       "name": "basic",
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/basic",
-      "process_args": ["process", "**/*.py", "--out", "output"],
-      "hooks": [],
     },
     {
       "name": "flattened",
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/flattened",
-      "process_args": ["process", "**/*.py", "--out", "output", "--flatten"],
-      "hooks": [],
+      "process_args": ["--flatten"],
     },
     {
       "name": "env",
       "inputs_dir": test_dir / "inputs/with_imports",
       "outputs_dir": test_dir / "outputs/with_imports",
-      "process_args": ["process", "**/*.py", "--out", "output", "--env", "prod"],
-      "hooks": [],
+      "process_args": ["--env", "prod"],
     },
     {
       "name": "hooks",
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/with_hooks",
-      "process_args": ["process", "**/*.py", "--out", "output", "--hooks-file", "hooks/output_filename.py"],
+      "process_args": ["--hooks-file", "hooks/output_filename.py"],
       "hooks": ["output_filename.py"],
     },
   ]
@@ -61,8 +57,11 @@ def test_process_command_comprehensive(scenario):
   scenario_name = scenario["name"]
   inputs_dir = scenario["inputs_dir"]
   outputs_dir = scenario["outputs_dir"]
-  process_args = scenario["process_args"]
+  additional_args = scenario.get("process_args", [])
   hooks = scenario.get("hooks", [])
+
+  # Build complete process arguments
+  process_args = ["process", "**/*.py", "--out", "output"] + additional_args
 
   with runner.isolated_filesystem():
     # Copy all .py files recursively using glob

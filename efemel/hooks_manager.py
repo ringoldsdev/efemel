@@ -26,9 +26,11 @@ class HooksManager:
     module_name = os.path.basename(file_path).replace(".py", "")
 
     spec = importlib.util.spec_from_file_location(module_name, file_path)
+
     if spec is None:
       print(f"Error: Could not find module specification for {file_path}")
       return
+
     if spec.loader is None:
       print(f"Error: No loader found for module specification at {file_path}")
       return
@@ -40,19 +42,23 @@ class HooksManager:
       print(f"Successfully loaded hooks module: {module_name} from {file_path}")
 
       # Register all functions in the module as hooks
-      for attr_name in dir(module):
-        if not attr_name.startswith("_"):  # Skip private/dunder methods
-          attr_value = getattr(module, attr_name)
-          if callable(attr_value):
-            # Check if it's a before hook
-            if attr_name.startswith("before_"):
-              # Extract the hook name by removing the "before_" prefix
-              hook_name = attr_name[7:]  # Remove "before_" prefix
-              self.add_before(hook_name, attr_value)
-              print(f"Registered function '{attr_name}' as before hook for '{hook_name}'.")
-            else:
-              self.add(attr_name, attr_value)
-              print(f"Registered function '{attr_name}' as hook.")
+      for attr_name in module.__dict__:
+        if attr_name.startswith("_"):  # Skip private/dunder methods
+          continue
+        attr_value = getattr(module, attr_name)
+
+        if not callable(attr_value):
+          continue
+
+        # Check if it's a before hook
+        if attr_name.startswith("before_"):
+          # Extract the hook name by removing the "before_" prefix
+          hook_name = attr_name[7:]  # Remove "before_" prefix
+          self.add_before(hook_name, attr_value)
+          print(f"Registered function '{attr_name}' as before hook for '{hook_name}'.")
+        else:
+          self.add(attr_name, attr_value)
+          print(f"Registered function '{attr_name}' as hook.")
 
     except Exception as e:
       print(f"Error loading hooks from {file_path}: {e}")
