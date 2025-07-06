@@ -25,7 +25,7 @@ def get_test_scenarios():
       "hooks": [],
     },
     {
-      "name": "basic flattened",
+      "name": "flattened",
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/flattened",
       "process_args": ["process", "**/*.py", "--out", "output", "--flatten"],
@@ -39,7 +39,7 @@ def get_test_scenarios():
       "hooks": [],
     },
     {
-      "name": "basic with hooks",
+      "name": "hooks",
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/with_hooks",
       "process_args": ["process", "**/*.py", "--out", "output", "--hooks-file", "hooks/output_filename.py"],
@@ -48,7 +48,7 @@ def get_test_scenarios():
   ]
 
 
-@pytest.mark.parametrize("scenario", get_test_scenarios())
+@pytest.mark.parametrize("scenario", get_test_scenarios(), ids=lambda scenario: scenario["name"])
 def test_process_command_comprehensive(scenario):
   """
   Test the process command with all input files and compare to expected outputs.
@@ -96,8 +96,6 @@ def test_process_command_comprehensive(scenario):
     # Run the process command on all Python files recursively
     result = runner.invoke(cli, process_args)
     assert result.exit_code == 0, f"Command failed for scenario '{scenario_name}' with output: {result.output}"
-
-    print(f"Generated files for {scenario_name}: {get_files(Path('output'))}")
 
     # For other scenarios, compare content of each file with expected outputs
     for expected_file in outputs_dir.glob("**/*.json"):
