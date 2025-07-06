@@ -1,432 +1,479 @@
+---
+name: "Efemel"
+short_description: "Python-nati**Primary Use Cases:**
+- **CI/CD Pipelines:** Generate GitHub Actions, GitLab CI, or Jenkins workflows with complex logic and conditions
+- **Cloud Workflows:** AWS Step Functions, Google Cloud Workflows, Azure Logic Apps with dynamic state machines
+- **Infrastructure as Code:** Terraform, CloudFormation, or ARM templates with environment-specific resources
+- **Docker Compose:** Multi-service applications with environment-specific configurations and overrides
+- **Application Config:** API settings, database connections, feature flags across dev/staging/prod environments
+- **API Gateway Configs:** Route definitions, rate limiting, authentication rules for different environments
+- **Monitoring & Alerting:** Datadog monitors, New Relic alerts, or custom monitoring rules with complex conditionsguration tool eliminating YAML templating hell and markup language complexity"
+long_description: "Efemel is a developer tool that uses Python dictionaries as a configuration language, replacing difficult-to-template markup formats (YAML, JSON, TOML) with native Python syntax for complex configuration management, multi-environment deployments, and automated validation."
+version: "1.0.0"
+license: "MIT"
+primary_language: "Python"
+category: "DevOps Tool"
+keywords: ["python", "configuration", "templating", "yaml-alternative", "devops", "config-management", "multi-environment"]
+status: "Active Development"
+target_audience: ["DevOps Engineers", "Platform Engineers", "Configuration Managers", "Infrastructure Teams"]
+github_repo_url: "https://github.com/your-username/efemel"
+documentation_url: "https://github.com/your-username/efemel/wiki"
+contributing_guide_url: "https://github.com/your-username/efemel/wiki/Development"
+issue_tracker_url: "https://github.com/your-username/efemel/issues"
+---
+
+<!-- PROJECT_TITLE -->
 # Efemel
 
-**Efemel** is a Python CLI tool that extracts public dictionary variables from Python files and exports them as JSON. It's designed to help you extract configuration data, settings, and structured data from Python code.
-
-## What does Efemel do?
-
-Efemel processes Python files and extracts all public dictionary variables (those not starting with `_`), then exports them to JSON files while preserving directory structure.
-
-### Example
-
-Given this Python file (`config.py`):
-
-```python
-# Public dictionaries - these will be extracted
-database_config = {
-    "host": "localhost",
-    "port": 5432,
-    "name": "myapp_db"
-}
-
-api_settings = {
-    "timeout": 30,
-    "retries": 3,
-    "endpoints": ["auth", "users", "data"]
-}
-
-# Private variables - these will be ignored
-_internal_config = {"secret": "hidden"}
-__cache_settings = {"ttl": 3600}
-
-# Non-dictionaries - these will be ignored
-API_URL = "https://api.example.com"
-DEBUG = True
-```
-
-Running `efemel process config.py --out output` produces `output/config.json`:
-
-```json
-{
-  "database_config": {
-    "host": "localhost",
-    "port": 5432,
-    "name": "myapp_db"
-  },
-  "api_settings": {
-    "timeout": 30,
-    "retries": 3,
-    "endpoints": ["auth", "users", "data"]
-  }
-}
-```
-
-## Installation
-
-```bash
-# Install in development mode
-uv pip install -e .
-
-# Or install from source
-pip install .
-```
-
-## Usage
-
-### Basic Usage
-
-```bash
-# Process a single file
-efemel process config.py --out output
-
-# Process multiple files with glob patterns (uses all CPU cores by default)
-efemel process "src/**/*.py" --out exports
-
-# Process files relative to a specific directory
-efemel process "**/*.py" --cwd /path/to/project --out output
-
-# Control parallelism with --workers option
-efemel process "**/*.py" --out output --workers 2
-```
-
-### Real-world Example
-
-Consider this project structure:
-
-```
-project/
-├── config/
-│   ├── database.py
-│   └── api.py
-└── settings/
-    └── app.py
-```
-
-With these files:
-
-**config/database.py:**
-```python
-production = {
-    "host": "prod-db.company.com",
-    "port": 5432,
-    "ssl": True
-}
-
-development = {
-    "host": "localhost",
-    "port": 5432,
-    "ssl": False
-}
-```
-
-**config/api.py:**
-```python
-endpoints = {
-    "auth": "/api/v1/auth",
-    "users": "/api/v1/users",
-    "data": "/api/v1/data"
-}
-
-rate_limits = {
-    "requests_per_minute": 60,
-    "burst_limit": 100
-}
-```
-
-**settings/app.py:**
-```python
-app_config = {
-    "name": "MyApp",
-    "version": "2.1.0",
-    "features": ["auth", "api", "dashboard"]
-}
-```
-
-Running:
-```bash
-efemel process "**/*.py" --out exported_config
-```
-
-Produces:
-```
-exported_config/
-├── config/
-│   ├── database.json
-│   └── api.json
-└── settings/
-    └── app.json
-```
-
-With `exported_config/config/database.json`:
-```json
-{
-  "production": {
-    "host": "prod-db.company.com",
-    "port": 5432,
-    "ssl": true
-  },
-  "development": {
-    "host": "localhost",
-    "port": 5432,
-    "ssl": false
-  }
-}
-```
-
-## CLI Commands
-
-### `efemel process`
-
-Extract dictionary variables from Python files.
-
-**Options:**
-- `FILE_PATTERN` - Glob pattern to match Python files (e.g., `"**/*.py"`, `config.py`)
-- `--out OUTPUT_DIR` - Directory to write JSON files (required)
-- `--cwd DIRECTORY` - Working directory for file operations (optional)
-- `--env ENVIRONMENT` - Environment for dynamic imports (e.g., `prod`, `staging`) (optional)
-- `--workers NUMBER` - Number of parallel workers (default: CPU thread count) (optional)
-
-**Examples:**
-```bash
-# Single file
-efemel process config.py --out output
-
-# All Python files recursively (uses all CPU cores)
-efemel process "**/*.py" --out output
-
-# Files in specific directory with 2 workers
-efemel process "src/config/*.py" --out exported --workers 2
-
-# Process relative to different directory
-efemel process "*.py" --cwd /path/to/configs --out output
-
-# Process with production environment
-efemel process "config/**/*.py" --out output --env prod
-
-# Process with staging environment and custom working directory (single-threaded)
-efemel process "**/*.py" --cwd /app/configs --out exports --env staging --workers 1
-```
-
-### `efemel info`
-
-Show package information and version.
-
-## Environment-Specific Processing
-
-Efemel supports environment-specific file loading using the `--env` option. This allows you to dynamically load different configurations based on the environment (dev, prod, staging, etc.).
-
-### How it works
-
-When you specify `--env <environment>`, Efemel will:
-1. For any `import` statements in your Python files, look for `<module>.<environment>.py` first
-2. If the environment-specific file doesn't exist, fall back to the default `<module>.py`
-
-### Example: Dev vs Production Configuration
-
-Consider this project structure:
-```
-config/
-├── main.py           # Main configuration file
-├── database.py       # Default database config
-├── database.prod.py  # Production database config
-├── cache.py          # Default cache config
-└── cache.prod.py     # Production cache config
-```
-
-**config/main.py:**
-```python
-from database import connection_config
-from cache import cache_settings
-
-# Main application configuration
-app_config = {
-    "name": "MyApp",
-    "version": "2.0.0",
-    "database": connection_config,
-    "cache": cache_settings
-}
-
-deployment = {
-    "workers": 4,
-    "timeout": 30
-}
-```
-
-**config/database.py** (development):
-```python
-connection_config = {
-    "host": "localhost",
-    "port": 5432,
-    "database": "myapp_dev",
-    "ssl": False,
-    "pool_size": 5
-}
-```
-
-**config/database.prod.py** (production):
-```python
-connection_config = {
-    "host": "prod-cluster.company.com",
-    "port": 5432,
-    "database": "myapp_production",
-    "ssl": True,
-    "pool_size": 20,
-    "ssl_cert": "/etc/ssl/prod.pem"
-}
-```
-
-**config/cache.py** (development):
-```python
-cache_settings = {
-    "type": "memory",
-    "max_size": 100,
-    "ttl": 300
-}
-```
-
-**config/cache.prod.py** (production):
-```python
-cache_settings = {
-    "type": "redis",
-    "host": "redis-cluster.company.com",
-    "port": 6379,
-    "ttl": 3600,
-    "cluster_mode": True
-}
-```
-
-### Processing with Different Environments
-
-**Development environment (default):**
-```bash
-efemel process config/main.py --out output/dev
-```
-
-This generates `output/dev/main.json`:
-```json
-{
-  "app_config": {
-    "name": "MyApp",
-    "version": "2.0.0",
-    "database": {
-      "host": "localhost",
-      "port": 5432,
-      "database": "myapp_dev",
-      "ssl": false,
-      "pool_size": 5
-    },
-    "cache": {
-      "type": "memory",
-      "max_size": 100,
-      "ttl": 300
-    }
-  },
-  "deployment": {
-    "workers": 4,
-    "timeout": 30
-  }
-}
-```
-
-**Production environment:**
-```bash
-efemel process config/main.py --out output/prod --env prod
-```
-
-This generates `output/prod/main.json`:
-```json
-{
-  "app_config": {
-    "name": "MyApp",
-    "version": "2.0.0",
-    "database": {
-      "host": "prod-cluster.company.com",
-      "port": 5432,
-      "database": "myapp_production",
-      "ssl": true,
-      "pool_size": 20,
-      "ssl_cert": "/etc/ssl/prod.pem"
-    },
-    "cache": {
-      "type": "redis",
-      "host": "redis-cluster.company.com",
-      "port": 6379,
-      "ttl": 3600,
-      "cluster_mode": true
-    }
-  },
-  "deployment": {
-    "workers": 4,
-    "timeout": 30
-  }
-}
-```
-
-### Environment Options Examples
-
-```bash
-# Development (default behavior)
-efemel process "config/**/*.py" --out exports/dev
-
-# Production environment
-efemel process "config/**/*.py" --out exports/prod --env prod
-
-# Staging environment  
-efemel process "config/**/*.py" --out exports/staging --env staging
-
-# Test environment
-efemel process "config/**/*.py" --out exports/test --env test
-```
-
-## Development
-
-### Quick Start
-
-```bash
-# Install development dependencies
-uv sync --dev
-
-# Run tests
-uv run pytest
-
-# Run linting and formatting
-uv run ruff check .
-uv run ruff format .
-```
-
-### Project Structure
-
-```
-efemel/
-├── efemel/              # Main package
-│   ├── cli.py          # CLI interface
-│   ├── main.py         # Core logic
-│   └── process.py      # File processing
-├── tests/              # Test files and fixtures
-│   ├── inputs_basic/   # Test input files
-│   ├── outputs_basic/  # Expected outputs
-│   └── test_cli.py     # Test suite
-└── pyproject.toml      # Project configuration
-```
-
-### Makefile Commands
-
-```bash
-make help           # Show available commands
-make test           # Run tests
-make check          # Run all checks (lint + format + test)
-make generate-test-outputs  # Regenerate test outputs
-```
-
-## Use Cases
-
-- **Configuration Export**: Extract configuration dictionaries from Python files to JSON for other tools
-- **Data Migration**: Convert Python data structures to JSON for database seeding or API payloads
-- **Documentation**: Generate JSON schemas or API documentation from Python configuration files
-- **Multi-environment Config**: Export environment-specific configurations from Python modules
-
-## What gets extracted?
-
-✅ **Extracted:**
-- Public dictionary variables (not starting with `_`)
-- Nested dictionaries and complex data structures
-- All standard JSON-compatible Python data types
-
-❌ **Ignored:**
-- Private variables (`_private`, `__internal`)
-- Non-dictionary variables (strings, numbers, lists, etc.)
-- Functions and classes
-- Import statements
+<!-- PROJECT_TAGLINE -->
+**Python turned into a functional markup language. Also what I've said thousands of times while working with yaml.**
+
+<!-- BADGES_SECTION -->
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Built with UV](https://img.shields.io/badge/built%20with-uv-green)](https://github.com/astral-sh/uv)
+[![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ---
 
-Built with ❤️ using [UV](https://github.com/astral-sh/uv) package manager.
+<!-- INTRODUCTION_SECTION -->
+## 🎯 Overview
+
+**Efemel** is a configuration management tool that replaces complex markup templating with native Python syntax. Instead of wrestling with YAML templating engines, custom DSLs, or markup languages that don't scale, Efemel lets you write configurations in Python and export them to any format you need.
+
+**Pain Points Solved:**
+- **YAML at Scale:** Plain YAML becomes unmaintainable for complex configurations (1000+ line files, deep nesting)
+- **Templating Hell:** Tools like Helm, Jinja2, or Jsonnet require learning custom DSLs with poor tooling
+- **Zero Validation:** Markup languages provide no built-in validation, type checking, or IDE support
+- **Runtime-Only Errors:** Syntax and logic errors only discovered during deployment, not development
+- **Limited Logic:** Complex conditionals, loops, and transformations are impossible or unreadable in markup
+- **Copy-Paste Culture:** Configuration duplication across environments leads to drift and maintenance nightmares
+
+**Why Python for Configuration:**
+- **Native Language:** Use familiar Python syntax instead of learning templating DSLs or custom languages
+- **Built-in Validation:** Leverage Python's type system, IDE autocomplete, and linting for immediate feedback
+- **Full Programming Power:** Complex logic, imports, functions, classes - everything Python offers
+- **Excellent Tooling:** IDE support, debugging, unit testing, version control, and code review workflows
+- **Instant Feedback:** Syntax errors, type issues, and logic problems caught during development, not deployment
+- **Reusable Components:** Create shared libraries of configuration components with proper imports and modules
+
+**Primary Use Cases:**
+- **CI/CD Pipelines:** Generate GitHub Actions, GitLab CI, or Jenkins workflows with complex logic and conditions
+- **Workflows:** AWS Step Functions, Google Cloud Workflows, Azure Logic Apps with dynamic state machines
+- **Infrastructure as Code:** Terraform, CloudFormation, or ARM templates with environment-specific resources
+- **Docker Compose:** Multi-service applications with environment-specific configurations and overrides
+- **Application Config:** API settings, database connections, feature flags across dev/staging/prod environments
+
+---
+
+<!-- FEATURES_SECTION -->
+## ✨ Features & Capabilities
+
+### Core Functionality
+- **Python-Native Configuration:** Write configs in Python instead of learning templating languages
+- **Multi-Format Export:** Generate JSON, YAML, TOML, or any structured format
+- **Structure Preservation:** Maintains source directory hierarchy in output
+- **Parallel Processing:** Multi-threaded processing for large configuration projects
+- **Glob Pattern Support:** Flexible file selection with Unix-style patterns
+- **IDE Integration:** Full autocomplete, type checking, and error detection during development
+
+### Advanced Features  
+- **Environment-Specific Processing:** Different configs per environment without templating (`--env prod`)
+- **Extensible Hook System:** Custom transformation pipeline for output formatting
+- **Auto-Validation:** Leverage Python's type system and IDE validation
+- **Zero Configuration:** Works out-of-the-box with sensible defaults
+- **Testable Configurations:** Unit test your configs like any Python code
+- **Live Reload:** Instant feedback loop - see configuration changes immediately
+
+---
+
+<!-- INSTALLATION_SECTION -->
+## 📦 Installation & Setup
+
+To be filled out once it gets compiled and released.
+
+---
+
+<!-- USAGE_SECTION -->
+## 🚀 Usage Examples
+
+### Basic Usage
+
+#### Single File Processing
+```bash
+# Extract dictionaries from one file
+efemel process config.py --out output/
+```
+
+#### Batch Processing
+```bash
+# Process all Python files recursively
+efemel process "**/*.py" --out exported_configs/
+
+# Process specific directory
+efemel process "src/config/*.py" --out configs/
+```
+
+### Advanced Usage
+
+#### Environment-Specific Processing
+```bash
+# Production environment
+efemel process "config/**/*.py" --out prod_config/ --env prod
+
+# Development environment  
+efemel process "config/**/*.py" --out dev_config/ --env dev
+
+# Staging with custom working directory
+efemel process "*.py" --cwd /app/configs --out staging/ --env staging
+```
+
+#### Performance Tuning
+```bash
+# Control parallel workers
+efemel process "**/*.py" --out output/ --workers 4
+
+# Single-threaded processing
+efemel process "**/*.py" --out output/ --workers 1
+```
+
+#### Hook-Based Transformations
+```bash
+# Use hook directory
+efemel process "**/*.py" --out output/ --hooks hooks/
+```
+
+### Core Patterns & Examples
+
+#### Pattern 1: Basic Dictionary Extraction
+
+**Input (`app_config.py`):**
+```python
+# Basic dictionary variables are extracted
+app_config = {
+    "name": "my-app",
+    "version": "1.0.0",
+    "port": 8080
+}
+
+database = {
+    "host": "localhost",
+    "port": 5432,
+    "name": "app_db"
+}
+
+# Private variables (underscore prefix) are ignored
+_internal_config = {"secret": "hidden"}
+
+# Non-dictionary variables are ignored
+DEBUG = True
+```
+
+**Output (`efemel process app_config.py --out configs/`):**
+
+*app_config.json:*
+```json
+{
+  "app_config": {
+    "name": "my-app", 
+    "version": "1.0.0",
+    "port": 8080
+  },
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "app_db"
+  }
+}
+```
+
+#### Pattern 2: Environment-Specific File Overrides
+
+**Input Files:**
+
+*config.py (default):*
+```python
+server_config = {
+    "app_name": "api-server",
+    "log_level": "INFO",
+    "workers": 2,
+    "timeout": 30
+}
+```
+
+*config.prod.py (production override):*
+```python
+server_config = {
+    "app_name": "api-server",
+    "log_level": "INFO",
+    "workers": 8,
+    "timeout": 60,
+    "monitoring_enabled": True
+}
+```
+
+*main.py (imports the config):*
+```python
+from config import server_config
+
+application = {
+    "name": "web-api",
+    "config": server_config
+}
+```
+
+**Default Output (`efemel process main.py --out configs/`):**
+```json
+{
+  "application": {
+    "name": "web-api",
+    "config": {
+      "app_name": "api-server",
+      "log_level": "INFO",
+      "workers": 2,
+      "timeout": 30
+    }
+  }
+}
+```
+
+**Production Output (`efemel process main.py --out configs/ --env prod`):**
+```json
+{
+  "application": {
+    "name": "web-api",
+    "config": {
+      "app_name": "api-server",
+      "log_level": "INFO",
+      "workers": 8,
+      "timeout": 60,
+      "monitoring_enabled": true
+    }
+  }
+}
+```
+
+#### Pattern 3: Composable Configuration Parts
+
+**Input (`docker_config.py`):**
+```python
+# Base service definition
+base_service = {
+    "restart": "unless-stopped",
+    "networks": ["app-network"]
+}
+
+# Reusable components
+logging_config = {
+    "driver": "json-file",
+    "options": {
+        "max-size": "10m",
+        "max-file": "3"
+    }
+}
+
+health_check = {
+    "test": ["CMD", "curl", "-f", "http://localhost:8080/health"],
+    "interval": "30s",
+    "timeout": "10s",
+    "retries": 3
+}
+
+# Compose services using dict merging
+web_service = {
+    **base_service,
+    "image": "nginx:alpine",
+    "ports": ["80:80"],
+    "logging": logging_config,
+    "healthcheck": health_check
+}
+
+api_service = {
+    **base_service,
+    "image": "python:3.12",
+    "ports": ["8080:8080"],
+    "logging": logging_config,
+    "environment": {
+        "DATABASE_URL": "postgresql://localhost/app",
+        "REDIS_URL": "redis://localhost:6379"
+    }
+}
+
+# Final docker-compose structure
+docker_compose = {
+    "version": "3.8",
+    "services": {
+        "web": web_service,
+        "api": api_service
+    },
+    "networks": {
+        "app-network": {"driver": "bridge"}
+    }
+}
+```
+
+**Output (`efemel process docker_config.py --out configs/`):**
+
+*docker_config.json:*
+```json
+{
+  "docker_compose": {
+    "version": "3.8",
+    "services": {
+      "web": {
+        "restart": "unless-stopped",
+        "networks": ["app-network"],
+        "image": "nginx:alpine",
+        "ports": ["80:80"],
+        "logging": {
+          "driver": "json-file",
+          "options": {
+            "max-size": "10m", 
+            "max-file": "3"
+          }
+        },
+        "healthcheck": {
+          "test": ["CMD", "curl", "-f", "http://localhost:8080/health"],
+          "interval": "30s",
+          "timeout": "10s",
+          "retries": 3
+        }
+      },
+      "api": {
+        "restart": "unless-stopped",
+        "networks": ["app-network"],
+        "image": "python:3.12",
+        "ports": ["8080:8080"],
+        "environment": {
+          "DATABASE_URL": "postgresql://localhost/app",
+          "REDIS_URL": "redis://localhost:6379"
+        }
+      }
+    },
+    "networks": {
+      "app-network": {"driver": "bridge"}
+    }
+  }
+}
+```
+
+### Compare: Traditional YAML vs. Efemel Approach
+
+#### ❌ Traditional YAML + Templating
+```yaml
+# app-config-prod.yaml
+app_name: "{{ .AppName }}"
+log_level: {{ if eq .Environment "prod" }}"INFO"{{ else }}"DEBUG"{{ end }}
+workers: {{ if eq .Environment "prod" }}8{{ else if eq .Environment "dev" }}1{{ else }}2{{ end }}
+{{- if eq .Environment "prod" }}
+monitoring_enabled: true
+{{- end }}
+
+# app-config-dev.yaml (separate file with duplication)
+app_name: "{{ .AppName }}"
+log_level: "DEBUG"
+workers: 1
+
+# values-prod.yaml, values-dev.yaml (more files to maintain)
+AppName: "api-server"
+Environment: "prod"
+```
+
+**Problems:**
+- **No validation** until runtime deployment
+- **Complex templating** syntax that's hard to read and debug
+- **Multiple files** for each environment with copy-paste duplication
+- **Learning curve** for templating language
+- **Runtime-only errors** - broken templates discovered during deployment
+
+#### ✅ Efemel Python Approach
+```python
+# config.py (default)
+app_config = {
+    "app_name": "api-server",
+    "log_level": "INFO",
+    "workers": 2
+}
+
+# config.prod.py (production override)
+app_config = {
+    "app_name": "api-server", 
+    "log_level": "INFO",
+    "workers": 8,
+    "monitoring_enabled": True
+}
+
+# main.py (imports based on --env flag)
+from config import app_config
+```
+
+**Benefits:**
+- **Immediate validation** with Python type hints and IDE support
+- **Full IDE support** - autocomplete, refactoring, debugging
+- **Unit testable** configuration logic
+- **Standard Python** - no new syntax to learn
+- **Instant feedback** during development
+
+---
+
+<!-- CONFIGURATION_SECTION -->
+## ⚙️ Configuration
+
+### Command-Line Options
+
+| Option | Short | Type | Required | Default | Description |
+|--------|-------|------|----------|---------|-------------|
+| `FILE_PATTERN` | - | `str` | Yes | - | Glob pattern for Python files |
+| `--out` | `-o` | `str` | Yes | - | Output directory path |
+| `--cwd` | `-c` | `str` | No | `"."` | Working directory for file operations |
+| `--env` | `-e` | `str` | No | `None` | Environment name for imports |
+| `--workers` | `-w` | `int` | No | `CPU_COUNT` | Number of parallel workers |
+| `--hooks` | `-h` | `str` | No | `None` | Path to hooks file or directory |
+| `--flatten` | `-f` | `flag` | No | `False` | Flatten directory structure |
+
+### Hook Configuration
+
+Create custom transformation hooks in Python:
+
+```python
+# hooks/output_filename.py
+def add_timestamp(context):
+    """Add timestamp to output filenames"""
+    from datetime import datetime
+    output_path = context['output_file_path']
+    timestamp = datetime.now().strftime('%Y%m%d')
+    new_name = f"{output_path.stem}_{timestamp}{output_path.suffix}"
+    context['output_file_path'] = output_path.with_name(new_name)
+```
+
+---
+
+<!-- LICENSE_SECTION -->
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+### License Summary
+- **Commercial Use:** Permitted
+- **Modification:** Permitted  
+- **Distribution:** Permitted
+- **Private Use:** Permitted
+- **Liability:** Not provided
+- **Warranty:** Not provided
+
+---
+
+<!-- FOOTER_SECTION -->
+## 🚀 Built With
+
+- **[Python 3.12+](https://python.org)** - Core language
+- **[UV Package Manager](https://github.com/astral-sh/uv)** - Dependency management
+- **[Click](https://click.palletsprojects.com/)** - CLI framework  
+- **[Ruff](https://github.com/astral-sh/ruff)** - Code formatting and linting
+- **[Pytest](https://pytest.org/)** - Testing framework
+- **[DevContainers](https://containers.dev/)** - Consistent development environment
+- **[GitHub Actions](https://github.com/features/actions)** - CI/CD automation
+
+---
+
+**⭐ Star this repository if Efemel helps your workflow!**
