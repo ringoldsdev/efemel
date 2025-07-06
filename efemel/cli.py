@@ -1,13 +1,11 @@
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path  # Import Path for file_path operations
+from pathlib import Path
 
 import click
 
 from efemel.hooks.output_filename import ensure_output_path, flatten_output_path
-
-# Import the new hooks manager
-from efemel.hooks_manager import hooks_manager  # Import the global instance
+from efemel.hooks_manager import hooks_manager
 from efemel.process import process_py_file
 from efemel.readers.local import LocalReader
 from efemel.transformers.json import JSONTransformer

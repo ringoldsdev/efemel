@@ -17,41 +17,47 @@ def get_test_scenarios():
   test_dir = Path(__file__).parent
 
   return [
-    (
-      "basic",
-      test_dir / "inputs_basic",
-      test_dir / "outputs_basic",
-      ["process", "**/*.py", "--out", "output"],
-    ),
-    (
-      "basic flattened",
-      test_dir / "inputs_basic",
-      test_dir / "outputs_basic_flattened",
-      ["process", "**/*.py", "--out", "output", "--flatten"],
-    ),
-    (
-      "env",
-      test_dir / "inputs_with_imports",
-      test_dir / "outputs_with_imports",
-      ["process", "**/*.py", "--out", "output", "--env", "prod"],
-    ),
-    (
-      "basic with hooks",
-      test_dir / "inputs_basic",
-      test_dir / "outputs_basic_with_hooks",
-      ["process", "**/*.py", "--out", "output", "--hooks-file", "hooks/output_filename.py"],
-    ),
+    {
+      "name": "basic",
+      "inputs_dir": test_dir / "inputs_basic",
+      "outputs_dir": test_dir / "outputs_basic",
+      "process_args": ["process", "**/*.py", "--out", "output"],
+    },
+    {
+      "name": "basic flattened",
+      "inputs_dir": test_dir / "inputs_basic",
+      "outputs_dir": test_dir / "outputs_basic_flattened",
+      "process_args": ["process", "**/*.py", "--out", "output", "--flatten"],
+    },
+    {
+      "name": "env",
+      "inputs_dir": test_dir / "inputs_with_imports",
+      "outputs_dir": test_dir / "outputs_with_imports",
+      "process_args": ["process", "**/*.py", "--out", "output", "--env", "prod"],
+    },
+    {
+      "name": "basic with hooks",
+      "inputs_dir": test_dir / "inputs_basic",
+      "outputs_dir": test_dir / "outputs_basic_with_hooks",
+      "process_args": ["process", "**/*.py", "--out", "output", "--hooks-file", "hooks/output_filename.py"],
+    },
   ]
 
 
-@pytest.mark.parametrize("scenario_name,inputs_dir,outputs_dir,process_args", get_test_scenarios())
-def test_process_command_comprehensive(scenario_name, inputs_dir, outputs_dir, process_args):
+@pytest.mark.parametrize("scenario", get_test_scenarios())
+def test_process_command_comprehensive(scenario):
   """
   Test the process command with all input files and compare to expected outputs.
   This test runs for each input/output folder pair found in the tests directory.
   Make sure that you've run `make generate-test-outputs` to create the expected outputs.
   """
   runner = CliRunner()
+
+  # Extract values from scenario dictionary
+  scenario_name = scenario["name"]
+  inputs_dir = scenario["inputs_dir"]
+  outputs_dir = scenario["outputs_dir"]
+  process_args = scenario["process_args"]
 
   with runner.isolated_filesystem():
     # Copy all .py files recursively using glob

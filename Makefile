@@ -48,7 +48,7 @@ check: lint format-check test
 
 # Run tests with pytest
 test:
-	uv run pytest
+	uv run pytest -n auto
 
 # Generate expected test outputs from test inputs
 generate-test-outputs:
