@@ -1,27 +1,3 @@
----
-name: "Efemel"
-short_description: "Python-nati**Primary Use Cases:**
-- **CI/CD Pipelines:** Generate GitHub Actions, GitLab CI, or Jenkins workflows with complex logic and conditions
-- **Cloud Workflows:** AWS Step Functions, Google Cloud Workflows, Azure Logic Apps with dynamic state machines
-- **Infrastructure as Code:** Terraform, CloudFormation, or ARM templates with environment-specific resources
-- **Docker Compose:** Multi-service applications with environment-specific configurations and overrides
-- **Application Config:** API settings, database connections, feature flags across dev/staging/prod environments
-- **API Gateway Configs:** Route definitions, rate limiting, authentication rules for different environments
-- **Monitoring & Alerting:** Datadog monitors, New Relic alerts, or custom monitoring rules with complex conditionsguration tool eliminating YAML templating hell and markup language complexity"
-long_description: "Efemel is a developer tool that uses Python dictionaries as a configuration language, replacing difficult-to-template markup formats (YAML, JSON, TOML) with native Python syntax for complex configuration management, multi-environment deployments, and automated validation."
-version: "1.0.0"
-license: "MIT"
-primary_language: "Python"
-category: "DevOps Tool"
-keywords: ["python", "configuration", "templating", "yaml-alternative", "devops", "config-management", "multi-environment"]
-status: "Active Development"
-target_audience: ["DevOps Engineers", "Platform Engineers", "Configuration Managers", "Infrastructure Teams"]
-github_repo_url: "https://github.com/your-username/efemel"
-documentation_url: "https://github.com/your-username/efemel/wiki"
-contributing_guide_url: "https://github.com/your-username/efemel/wiki/Development"
-issue_tracker_url: "https://github.com/your-username/efemel/issues"
----
-
 <!-- PROJECT_TITLE -->
 # Efemel
 
