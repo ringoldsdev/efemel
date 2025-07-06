@@ -62,11 +62,11 @@ generate-test-outputs:
 	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/flattened --flatten
 
 	@rm -rf tests/outputs_basic_with_hooks
-	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/with_hooks --hooks tests/hooks/output_filename.py
+	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/with_hooks --hooks tests/hooks/before_after/output_filename.py
 
 	@echo "Generating test outputs with hooks directory..."
 	@rm -rf tests/outputs/with_hooks_dir
-	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/with_hooks_dir --hooks tests/hooks
+	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/with_hooks_dir --hooks tests/hooks/multiple
 
 # Clean build artifacts and cache files
 clean:
