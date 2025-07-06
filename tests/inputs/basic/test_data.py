@@ -3,7 +3,7 @@
 Test file for the process command.
 """
 
-# Public dictionaries that should be extracted
+# Public data that should be extracted
 config = {
   "name": "test_app",
   "version": "1.0.0",
@@ -25,7 +25,7 @@ user_data = {
 _private_dict = {"secret": "value"}
 __dunder_dict = {"internal": "data"}
 
-# Non-dictionary variables (should be ignored)
+# Other serializable variables (should be extracted)
 APP_NAME = "test_app"
 VERSION = "1.0.0"
 enabled_features = ["auth", "api"]

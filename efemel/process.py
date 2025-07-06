@@ -101,5 +101,5 @@ def process_py_file(input_path: Path, environment: str = "default"):
       sys.modules[module_name] = original_module_in_sys
     sys.path = original_sys_path
 
-  # Extract all dictionary variables from module
+  # Extract all variables from module
   return module.__dict__
