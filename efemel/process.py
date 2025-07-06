@@ -105,11 +105,6 @@ def process_py_file(input_path: Path, environment: str = "default"):
   all_dicts = {}
 
   for attr_name in module.__dict__:
-    attr_value = getattr(module, attr_name)
-
-    if not isinstance(attr_value, dict):
-      continue
-
-    all_dicts[attr_name] = attr_value
+    all_dicts[attr_name] = getattr(module, attr_name)
 
   return all_dicts

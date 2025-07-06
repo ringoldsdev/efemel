@@ -6,5 +6,6 @@
   "config": {
     "app": "test",
     "version": "1.0"
-  }
+  },
+  "not_a_dict": "string value"
 }

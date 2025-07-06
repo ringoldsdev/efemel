@@ -86,6 +86,8 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap):
   if unwrap:
     hooks_manager.add("process_data", process_data_hooks.unwrap_data(unwrap))
 
+  hooks_manager.add("process_data", process_data_hooks.drop_non_json_serializable)
+
   # Load user-defined hooks if a path is specified
   if hooks:
     if os.path.isfile(hooks):
