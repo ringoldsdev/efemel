@@ -4,7 +4,8 @@ from pathlib import Path
 
 import click
 
-from efemel.hooks.output_filename import ensure_output_path, flatten_output_path
+from efemel.hooks import output_filename
+from efemel.hooks import process_data as process_data_hooks
 from efemel.hooks_manager import HooksManager
 from efemel.process import process_py_file
 from efemel.readers.local import LocalReader
@@ -49,7 +50,13 @@ def info():
   type=click.Path(exists=True, readable=True, resolve_path=True),
   help="Path to a Python file or directory containing user-defined hooks.",
 )
-def process(file_pattern, out, flatten, cwd, env, workers, hooks):
+@click.option(
+  "--pick",
+  "-p",
+  multiple=True,
+  help="Pick specific dictionary keys to extract (can be used multiple times)",
+)
+def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick):
   """Process Python files and extract public dictionary variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
@@ -63,7 +70,10 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks):
 
   if flatten:
     # Add the flatten_output_path hook to the hooks manager
-    hooks_manager.add("output_filename", flatten_output_path)
+    hooks_manager.add("output_filename", output_filename.flatten_output_path)
+
+  if pick:
+    hooks_manager.add("process_data", process_data_hooks.pick_data(pick))
 
   # Load user-defined hooks if a path is specified
   if hooks:
@@ -76,7 +86,7 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks):
     else:
       click.echo(f"Warning: Hooks path '{hooks}' is neither a file nor a directory")
 
-  hooks_manager.add("output_filename", ensure_output_path)
+  hooks_manager.add("output_filename", output_filename.ensure_output_path)
 
   # Collect all files to process
   files_to_process = list(reader.read(file_pattern))
@@ -90,7 +100,17 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks):
     try:
       # Always create output file, even if no dictionaries found
       public_dicts = process_py_file(cwd / file_path, env) or {}
-      transformed_data = transformer.transform(public_dicts)
+
+      (processed_data,) = hooks_manager.call(
+        "process_data",
+        {
+          "data": public_dicts,
+          "env": env,
+        },
+        return_params=["data"],
+      )
+
+      transformed_data = transformer.transform(processed_data)
 
       # Original proposed output filename (as a Path object for consistency)
       proposed_output_path = file_path.with_suffix(transformer.suffix)
