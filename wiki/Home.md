@@ -2,7 +2,7 @@
 # Efemel
 
 <!-- PROJECT_TAGLINE -->
-**Python turned into a functional markup language. Also what I've said thousands of times while working with yaml.**
+**Python as a functional markup language. Solves YAML scaling issues.**
 
 <!-- BADGES_SECTION -->
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -15,81 +15,66 @@
 <!-- INTRODUCTION_SECTION -->
 ## 🎯 Overview
 
-**Efemel** is a configuration management tool that replaces complex markup templating with native Python syntax. Instead of wrestling with YAML templating engines, custom DSLs, or markup languages that don't scale, Efemel lets you write configurations in Python and export them to any format you need.
+**Efemel** replaces markup templating with native Python. Solves configuration scaling issues without DSLs.
 
-**Pain Points Solved:**
-- **YAML at Scale:** Plain YAML becomes unmaintainable for complex configurations (1000+ line files, deep nesting)
-- **Templating Hell:** Tools like Helm, Jinja2, or Jsonnet require learning custom DSLs with poor tooling
-- **Zero Validation:** Markup languages provide no built-in validation, type checking, or IDE support
-- **Runtime-Only Errors:** Syntax and logic errors only discovered during deployment, not development
-- **Limited Logic:** Complex conditionals, loops, and transformations are impossible or unreadable in markup
-- **Copy-Paste Culture:** Configuration duplication across environments leads to drift and maintenance nightmares
+**Why Python:**
+- Native syntax instead of templating DSLs
+- Built-in validation and IDE support
+- Full programming capabilities
+- Testable configurations
 
-**Why Python for Configuration:**
-- **Native Language:** Use familiar Python syntax instead of learning templating DSLs or custom languages
-- **Built-in Validation:** Leverage Python's type system, IDE autocomplete, and linting for immediate feedback
-- **Full Programming Power:** Complex logic, imports, functions, classes - everything Python offers
-- **Excellent Tooling:** IDE support, debugging, unit testing, version control, and code review workflows
-- **Instant Feedback:** Syntax errors, type issues, and logic problems caught during development, not deployment
-- **Reusable Components:** Create shared libraries of configuration components with proper imports and modules
-
-**Primary Use Cases:**
-- **CI/CD Pipelines:** Generate GitHub Actions, GitLab CI, or Jenkins workflows with complex logic and conditions
-- **Workflows:** AWS Step Functions, Google Cloud Workflows, Azure Logic Apps with dynamic state machines
-- **Infrastructure as Code:** Terraform, CloudFormation, or ARM templates with environment-specific resources
-- **Docker Compose:** Multi-service applications with environment-specific configurations and overrides
-- **Application Config:** API settings, database connections, feature flags across dev/staging/prod environments
+**Use Cases:**
+- CI/CD pipelines
+- Infrastructure as Code
+- Workflow definitions
+- Docker Compose configs
+- Application settings
 
 ---
 
 <!-- FEATURES_SECTION -->
-## ✨ Features & Capabilities
+## ✨ Features
 
-### Core Functionality
-- **Python-Native Configuration:** Write configs in Python instead of learning templating languages
-- **Multi-Format Export:** Generate JSON, YAML, TOML, or any structured format
-- **Structure Preservation:** Maintains source directory hierarchy in output
-- **Parallel Processing:** Multi-threaded processing for large configuration projects
-- **Glob Pattern Support:** Flexible file selection with Unix-style patterns
-- **IDE Integration:** Full autocomplete, type checking, and error detection during development
+### Core
+- Python-native configuration
+- Multi-format export (JSON/YAML/TOML)
+- Directory structure preservation
+- Parallel processing
+- Glob pattern support
+- IDE integration
 
-### Advanced Features  
-- **Environment-Specific Processing:** Different configs per environment without templating (`--env prod`)
-- **Extensible Hook System:** Custom transformation pipeline for output formatting
-- **Auto-Validation:** Leverage Python's type system and IDE validation
-- **Zero Configuration:** Works out-of-the-box with sensible defaults
-- **Testable Configurations:** Unit test your configs like any Python code
-- **Live Reload:** Instant feedback loop - see configuration changes immediately
+### Advanced  
+- Environment-specific processing
+- Extensible hook system
+- Auto-validation
+- Testable configurations
+- Live reload
 
 ---
 
 <!-- INSTALLATION_SECTION -->
-## 📦 Installation & Setup
+## 📦 Installation
 
-To be filled out once it gets compiled and released.
+To be filled out once compiled and released.
 
 ---
 
 <!-- USAGE_SECTION -->
-## 🚀 Usage Examples
+## 🚀 Usage
 
-### Basic Usage
-
-#### Single File Processing
+### Basic
 ```bash
-# Extract dictionaries from one file
+# Single file
 efemel process config.py --out output/
-```
 
-#### Batch Processing
-```bash
-# Process all Python files recursively
+# Batch processing
 efemel process "**/*.py" --out exported_configs/
 
-# Process specific directory
-efemel process "src/config/*.py" --out configs/
-```
+# Pick specific keys
+efemel process "**/*.py" --out output/ --pick result
 
+# Unwrap values
+efemel process "**/*.py" --out output/ --unwrap result
 ### Advanced Usage
 
 #### Environment-Specific Processing
@@ -103,6 +88,8 @@ efemel process "config/**/*.py" --out dev_config/ --env dev
 # Staging with custom working directory
 efemel process "*.py" --cwd /app/configs --out staging/ --env staging
 ```
+
+### Advanced
 
 #### Performance Tuning
 ```bash
@@ -288,107 +275,48 @@ docker_compose = {
 }
 ```
 
-**Output (`efemel process docker_config.py --out configs/`):**
+**Output (`efemel process docker_config.py --out configs/ --unwrap docker_compose`):**
 
 *docker_config.json:*
 ```json
 {
-  "docker_compose": {
-    "version": "3.8",
-    "services": {
-      "web": {
-        "restart": "unless-stopped",
-        "networks": ["app-network"],
-        "image": "nginx:alpine",
-        "ports": ["80:80"],
-        "logging": {
-          "driver": "json-file",
-          "options": {
-            "max-size": "10m", 
-            "max-file": "3"
-          }
-        },
-        "healthcheck": {
-          "test": ["CMD", "curl", "-f", "http://localhost:8080/health"],
-          "interval": "30s",
-          "timeout": "10s",
-          "retries": 3
+  "version": "3.8",
+  "services": {
+    "web": {
+      "restart": "unless-stopped",
+      "networks": ["app-network"],
+      "image": "nginx:alpine",
+      "ports": ["80:80"],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m", 
+          "max-file": "3"
         }
       },
-      "api": {
-        "restart": "unless-stopped",
-        "networks": ["app-network"],
-        "image": "python:3.12",
-        "ports": ["8080:8080"],
-        "environment": {
-          "DATABASE_URL": "postgresql://localhost/app",
-          "REDIS_URL": "redis://localhost:6379"
-        }
+      "healthcheck": {
+        "test": ["CMD", "curl", "-f", "http://localhost:8080/health"],
+        "interval": "30s",
+        "timeout": "10s",
+        "retries": 3
       }
     },
-    "networks": {
-      "app-network": {"driver": "bridge"}
+    "api": {
+      "restart": "unless-stopped",
+      "networks": ["app-network"],
+      "image": "python:3.12",
+      "ports": ["8080:8080"],
+      "environment": {
+        "DATABASE_URL": "postgresql://localhost/app",
+        "REDIS_URL": "redis://localhost:6379"
+      }
     }
+  },
+  "networks": {
+    "app-network": {"driver": "bridge"}
   }
 }
 ```
-
-### Compare: Traditional YAML vs. Efemel Approach
-
-#### ❌ Traditional YAML + Templating
-```yaml
-# app-config-prod.yaml
-app_name: "{{ .AppName }}"
-log_level: {{ if eq .Environment "prod" }}"INFO"{{ else }}"DEBUG"{{ end }}
-workers: {{ if eq .Environment "prod" }}8{{ else if eq .Environment "dev" }}1{{ else }}2{{ end }}
-{{- if eq .Environment "prod" }}
-monitoring_enabled: true
-{{- end }}
-
-# app-config-dev.yaml (separate file with duplication)
-app_name: "{{ .AppName }}"
-log_level: "DEBUG"
-workers: 1
-
-# values-prod.yaml, values-dev.yaml (more files to maintain)
-AppName: "api-server"
-Environment: "prod"
-```
-
-**Problems:**
-- **No validation** until runtime deployment
-- **Complex templating** syntax that's hard to read and debug
-- **Multiple files** for each environment with copy-paste duplication
-- **Learning curve** for templating language
-- **Runtime-only errors** - broken templates discovered during deployment
-
-#### ✅ Efemel Python Approach
-```python
-# config.py (default)
-app_config = {
-    "app_name": "api-server",
-    "log_level": "INFO",
-    "workers": 2
-}
-
-# config.prod.py (production override)
-app_config = {
-    "app_name": "api-server", 
-    "log_level": "INFO",
-    "workers": 8,
-    "monitoring_enabled": True
-}
-
-# main.py (imports based on --env flag)
-from config import app_config
-```
-
-**Benefits:**
-- **Immediate validation** with Python type hints and IDE support
-- **Full IDE support** - autocomplete, refactoring, debugging
-- **Unit testable** configuration logic
-- **Standard Python** - no new syntax to learn
-- **Instant feedback** during development
 
 ---
 
@@ -406,6 +334,8 @@ from config import app_config
 | `--workers` | `-w` | `int` | No | `CPU_COUNT` | Number of parallel workers |
 | `--hooks` | `-h` | `str` | No | `None` | Path to hooks file or directory |
 | `--flatten` | `-f` | `flag` | No | `False` | Flatten directory structure |
+| `--pick` | `-p` | `str` | No | `None` | Pick specific dictionary keys (can be used multiple times) |
+| `--unwrap` | `-u` | `str` | No | `None` | Extract specific values from dictionaries, merging them (can be used multiple times) |
 
 ### Hook Configuration
 
@@ -428,14 +358,6 @@ def add_timestamp(context):
 ## 📄 License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
-### License Summary
-- **Commercial Use:** Permitted
-- **Modification:** Permitted  
-- **Distribution:** Permitted
-- **Private Use:** Permitted
-- **Liability:** Not provided
-- **Warranty:** Not provided
 
 ---
 
