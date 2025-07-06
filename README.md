@@ -108,11 +108,11 @@ efemel process "**/*.py" --out output/ --hooks hooks/
 
 ### Core Patterns & Examples
 
-#### Pattern 1: Basic Dictionary Extraction
+#### Pattern 1: Basic Data Extraction
 
 **Input (`app_config.py`):**
 ```python
-# Basic dictionary variables are extracted
+# All serializable variables are extracted
 app_config = {
     "name": "my-app",
     "version": "1.0.0",
@@ -125,11 +125,17 @@ database = {
     "name": "app_db"
 }
 
+# Simple values are also extracted
+app_name = "my-application"
+debug_mode = True
+max_connections = 100
+
 # Private variables (underscore prefix) are ignored
 _internal_config = {"secret": "hidden"}
+_debug_flag = False
 
-# Non-dictionary variables are ignored
-DEBUG = True
+# Non-serializable variables are filtered out
+import os  # This won't be extracted
 ```
 
 **Output (`efemel process app_config.py --out configs/`):**
@@ -146,7 +152,10 @@ DEBUG = True
     "host": "localhost",
     "port": 5432,
     "name": "app_db"
-  }
+  },
+  "app_name": "my-application",
+  "debug_mode": true,
+  "max_connections": 100
 }
 ```
 
@@ -242,7 +251,7 @@ health_check = {
     "retries": 3
 }
 
-# Compose services using dict merging
+# Compose services using Python dict merging
 web_service = {
     **base_service,
     "image": "nginx:alpine",
@@ -334,8 +343,8 @@ docker_compose = {
 | `--workers` | `-w` | `int` | No | `CPU_COUNT` | Number of parallel workers |
 | `--hooks` | `-h` | `str` | No | `None` | Path to hooks file or directory |
 | `--flatten` | `-f` | `flag` | No | `False` | Flatten directory structure |
-| `--pick` | `-p` | `str` | No | `None` | Pick specific dictionary keys (can be used multiple times) |
-| `--unwrap` | `-u` | `str` | No | `None` | Extract specific values from dictionaries, merging them (can be used multiple times) |
+| `--pick` | `-p` | `str` | No | `None` | Pick specific keys from the extracted data (can be used multiple times) |
+| `--unwrap` | `-u` | `str` | No | `None` | Extract specific values from the processed data, merging them (can be used multiple times) |
 
 ### Hook Configuration
 

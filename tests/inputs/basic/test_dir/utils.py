@@ -1,8 +1,8 @@
 """
-Test file with no dictionaries.
+Test file with no data.
 """
 
-# Non-dictionary variables (should be ignored)
+# Non-serializable variables (should be filtered out)
 APP_NAME = "test_app"
 VERSION = "1.0.0"
 enabled_features = ["auth", "api"]

@@ -29,5 +29,11 @@
       "name": "Guest User",
       "role": "guest"
     }
-  }
+  },
+  "APP_NAME": "test_app",
+  "VERSION": "1.0.0",
+  "enabled_features": [
+    "auth",
+    "api"
+  ]
 }

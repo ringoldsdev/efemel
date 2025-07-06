@@ -54,16 +54,16 @@ def info():
   "--pick",
   "-p",
   multiple=True,
-  help="Pick specific dictionary keys to extract (can be used multiple times)",
+  help="Pick specific keys from the extracted data (can be used multiple times)",
 )
 @click.option(
   "--unwrap",
   "-u",
   multiple=True,
-  help="Extract specific values from the processed data dictionary, merging them (can be used multiple times)",
+  help="Extract specific values from the processed data, merging them (can be used multiple times)",
 )
 def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap):
-  """Process Python files and extract public dictionary variables to JSON.
+  """Process Python files and extract serializable variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
   """
@@ -78,11 +78,15 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap):
     # Add the flatten_output_path hook to the hooks manager
     hooks_manager.add("output_filename", output_filename.flatten_output_path)
 
+  hooks_manager.add("process_data", process_data_hooks.skip_private_properties)
+
   if pick:
     hooks_manager.add("process_data", process_data_hooks.pick_data(pick))
 
   if unwrap:
     hooks_manager.add("process_data", process_data_hooks.unwrap_data(unwrap))
+
+  hooks_manager.add("process_data", process_data_hooks.drop_non_json_serializable)
 
   # Load user-defined hooks if a path is specified
   if hooks:
@@ -107,13 +111,13 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap):
   def process_single_file(file_path: Path, cwd: Path):  # Added type hint for clarity
     """Process a single file and return results."""
     try:
-      # Always create output file, even if no dictionaries found
-      public_dicts = process_py_file(cwd / file_path, env) or {}
+      # Always create output file, even if no serializable data found
+      serializable_data = process_py_file(cwd / file_path, env) or {}
 
       (processed_data,) = hooks_manager.call(
         "process_data",
         {
-          "data": public_dicts,
+          "data": serializable_data,
           "env": env,
         },
         return_params=["data"],
