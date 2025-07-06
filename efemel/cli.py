@@ -1,8 +1,11 @@
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 import click
 
+from efemel.hooks.output_filename import ensure_output_path, flatten_output_path
+from efemel.hooks_manager import HooksManager
 from efemel.process import process_py_file
 from efemel.readers.local import LocalReader
 from efemel.transformers.json import JSONTransformer
@@ -31,6 +34,7 @@ def info():
 @cli.command()
 @click.argument("file_pattern")
 @click.option("--out", "-o", required=True, help="Output directory for JSON files")
+@click.option("--flatten", "-f", is_flag=True, default=False, help="Flatten the output file name")
 @click.option("--env", "-e", help="Environment for processing (default: none)")
 @click.option("--cwd", "-c", help="Working directory to search for files (default: current)")
 @click.option(
@@ -39,15 +43,40 @@ def info():
   default=DEFAULT_WORKERS,
   help=f"Number of parallel workers (default: {DEFAULT_WORKERS})",
 )
-def process(file_pattern, out, cwd, env, workers):
+@click.option(
+  "--hooks",
+  "-h",
+  type=click.Path(exists=True, readable=True, resolve_path=True),
+  help="Path to a Python file or directory containing user-defined hooks.",
+)
+def process(file_pattern, out, flatten, cwd, env, workers, hooks):
   """Process Python files and extract public dictionary variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
   """
 
+  hooks_manager = HooksManager()
+
   reader = LocalReader(cwd)
   transformer = JSONTransformer()
   writer = LocalWriter(out, reader.original_cwd)
+
+  if flatten:
+    # Add the flatten_output_path hook to the hooks manager
+    hooks_manager.add("output_filename", flatten_output_path)
+
+  # Load user-defined hooks if a path is specified
+  if hooks:
+    if os.path.isfile(hooks):
+      hooks_manager.load_user_file(hooks)
+      click.echo(f"User hooks loaded from file: {hooks}")
+    elif os.path.isdir(hooks):
+      hooks_manager.load_hooks_directory(hooks)
+      click.echo(f"User hooks loaded from directory: {hooks}")
+    else:
+      click.echo(f"Warning: Hooks path '{hooks}' is neither a file nor a directory")
+
+  hooks_manager.add("output_filename", ensure_output_path)
 
   # Collect all files to process
   files_to_process = list(reader.read(file_pattern))
@@ -56,17 +85,33 @@ def process(file_pattern, out, cwd, env, workers):
     click.echo("No files found matching the pattern.")
     return
 
-  def process_single_file(file_path):
+  def process_single_file(file_path: Path, cwd: Path):  # Added type hint for clarity
     """Process a single file and return results."""
     try:
       # Always create output file, even if no dictionaries found
-      public_dicts = process_py_file(file_path, env) or {}
+      public_dicts = process_py_file(cwd / file_path, env) or {}
       transformed_data = transformer.transform(public_dicts)
-      output_file = writer.write(transformed_data, file_path.with_suffix(transformer.suffix))
 
-      return file_path, output_file, f"Processed: {reader.cwd / file_path} → {output_file}"
+      # Original proposed output filename (as a Path object for consistency)
+      proposed_output_path = file_path.with_suffix(transformer.suffix)
+
+      (output_file_path,) = hooks_manager.call(
+        "output_filename",
+        {
+          "input_file_path": file_path,
+          "output_file_path": proposed_output_path,
+          "output_dir": writer.output_dir,
+          "env": env,
+        },
+        return_params=["output_file_path"],
+      )
+
+      output_file = writer.write(transformed_data, output_file_path)
+
+      return file_path, output_file, f"Processed: {cwd / file_path} → {output_file}"
 
     except Exception as e:
+      # Ensure the exception message is clear about which file caused the error
       raise Exception(f"Error processing {file_path}: {str(e)}") from e
 
   # Process files in parallel
@@ -74,14 +119,19 @@ def process(file_pattern, out, cwd, env, workers):
 
   with ThreadPoolExecutor(max_workers=workers) as executor:
     # Submit all tasks
-    future_to_file = {executor.submit(process_single_file, file_path): file_path for file_path in files_to_process}
+    future_to_file = {
+      executor.submit(process_single_file, file_path, reader.cwd_path): file_path for file_path in files_to_process
+    }
     # Process completed tasks as they finish
     processed_count = 0
     for future in as_completed(future_to_file):
-      file_path, output_file, message = future.result()
-      click.echo(message)
-      if output_file:
-        processed_count += 1
+      try:
+        file_path, output_file, message = future.result()
+        click.echo(message)
+        if output_file:
+          processed_count += 1
+      except Exception as e:
+        click.echo(f"❌ {e}")  # Print errors from individual file processing
 
   click.echo(f"✅ Completed processing {processed_count}/{len(files_to_process)} files.")
 

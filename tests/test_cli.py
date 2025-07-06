@@ -17,23 +17,42 @@ def get_test_scenarios():
   test_dir = Path(__file__).parent
 
   return [
-    (
-      "basic",
-      test_dir / "inputs_basic",
-      test_dir / "outputs_basic",
-      ["process", "**/*.py", "--out", "output"],
-    ),
-    (
-      "env",
-      test_dir / "inputs_with_imports",
-      test_dir / "outputs_with_imports",
-      ["process", "**/*.py", "--out", "output", "--env", "prod"],
-    ),
+    {
+      "name": "basic",
+      "inputs_dir": test_dir / "inputs/basic",
+      "outputs_dir": test_dir / "outputs/basic",
+    },
+    {
+      "name": "flattened",
+      "inputs_dir": test_dir / "inputs/basic",
+      "outputs_dir": test_dir / "outputs/flattened",
+      "process_args": ["--flatten"],
+    },
+    {
+      "name": "env",
+      "inputs_dir": test_dir / "inputs/with_imports",
+      "outputs_dir": test_dir / "outputs/with_imports",
+      "process_args": ["--env", "prod"],
+    },
+    {
+      "name": "hooks",
+      "inputs_dir": test_dir / "inputs/basic",
+      "outputs_dir": test_dir / "outputs/with_hooks",
+      "process_args": ["--hooks", "hooks/before_after/output_filename.py"],
+      "hooks": ["before_after/output_filename.py"],
+    },
+    {
+      "name": "hooks-dir",
+      "inputs_dir": test_dir / "inputs/basic",
+      "outputs_dir": test_dir / "outputs/with_hooks_dir",
+      "process_args": ["--hooks", "hooks/multiple"],
+      "hooks": ["multiple/output_filename.py"],
+    },
   ]
 
 
-@pytest.mark.parametrize("scenario_name,inputs_dir,outputs_dir,process_args", get_test_scenarios())
-def test_process_command_comprehensive(scenario_name, inputs_dir, outputs_dir, process_args):
+@pytest.mark.parametrize("scenario", get_test_scenarios(), ids=lambda scenario: scenario["name"])
+def test_process_command_comprehensive(scenario):
   """
   Test the process command with all input files and compare to expected outputs.
   This test runs for each input/output folder pair found in the tests directory.
@@ -41,12 +60,22 @@ def test_process_command_comprehensive(scenario_name, inputs_dir, outputs_dir, p
   """
   runner = CliRunner()
 
+  # Extract values from scenario dictionary
+  scenario_name = scenario["name"]
+  inputs_dir = scenario["inputs_dir"]
+  outputs_dir = scenario["outputs_dir"]
+  additional_args = scenario.get("process_args", [])
+  hooks = scenario.get("hooks", [])
+
+  # Build complete process arguments
+  process_args = ["process", "**/*.py", "--out", "output"] + additional_args
+
   with runner.isolated_filesystem():
     # Copy all .py files recursively using glob
     for py_file in inputs_dir.glob("**/*.py"):
       # Calculate relative path from inputs directory
       rel_path = py_file.relative_to(inputs_dir)
-      target_path = Path(rel_path)
+      target_path = Path(rel_path)  # Copy directly to isolated filesystem root
 
       # Create parent directories if they don't exist
       target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -54,14 +83,29 @@ def test_process_command_comprehensive(scenario_name, inputs_dir, outputs_dir, p
       # Copy the file
       shutil.copy(py_file, target_path)
 
+    # Copy specified hooks files if they exist
+    hooks_dir = Path(__file__).parent / "hooks"
+    if hooks_dir.exists() and hooks:
+      for hook_filename in hooks:
+        hook_file = hooks_dir / hook_filename
+        if hook_file.exists():
+          # Calculate relative path from hooks directory
+          rel_path = hook_file.relative_to(hooks_dir)
+          target_path = Path("hooks") / rel_path
+
+          # Create parent directories if they don't exist
+          target_path.parent.mkdir(parents=True, exist_ok=True)
+
+          # Copy the file
+          shutil.copy(hook_file, target_path)
+
     # Run the process command on all Python files recursively
     result = runner.invoke(cli, process_args)
     assert result.exit_code == 0, f"Command failed for scenario '{scenario_name}' with output: {result.output}"
 
-    # Compare content of each file
-    for file_path in get_files(outputs_dir):
-      generated_file = Path("output") / file_path
-      expected_file = outputs_dir / file_path
+    # For other scenarios, compare content of each file with expected outputs
+    for expected_file in outputs_dir.glob("**/*.json"):
+      generated_file = Path("output") / expected_file.relative_to(outputs_dir)
 
       assert generated_file.exists(), f"Generated file {generated_file} not found for scenario '{scenario_name}'"
 
@@ -74,7 +118,7 @@ def test_process_command_comprehensive(scenario_name, inputs_dir, outputs_dir, p
 
       # Compare the JSON content
       assert generated_data == expected_data, (
-        f"Content mismatch in {file_path} for scenario '{scenario_name}':\n"
+        f"Content mismatch in {expected_file.relative_to(outputs_dir)} for scenario '{scenario_name}':\n"
         f"Generated: {generated_data}\n"
         f"Expected: {expected_data}"
       )

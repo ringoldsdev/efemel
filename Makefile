@@ -53,13 +53,20 @@ test:
 # Generate expected test outputs from test inputs
 generate-test-outputs:
 	@rm -rf tests/outputs_basic
-	@mkdir -p tests/outputs_basic
-	@uv run efemel process "**/*.py" --cwd tests/inputs_basic --out tests/outputs_basic
+	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/basic
 
 	@rm -rf tests/outputs_with_imports
-	@mkdir -p tests/outputs_with_imports
-	@uv run efemel process "*.py" --cwd tests/inputs_with_imports --out tests/outputs_with_imports --env prod
+	@uv run efemel process "*.py" --cwd tests/inputs/with_imports --out tests/outputs/with_imports --env prod
 
+	@rm -rf tests/outputs_basic_flattened
+	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/flattened --flatten
+
+	@rm -rf tests/outputs_basic_with_hooks
+	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/with_hooks --hooks tests/hooks/before_after/output_filename.py
+
+	@echo "Generating test outputs with hooks directory..."
+	@rm -rf tests/outputs/with_hooks_dir
+	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/with_hooks_dir --hooks tests/hooks/multiple
 
 # Clean build artifacts and cache files
 clean:

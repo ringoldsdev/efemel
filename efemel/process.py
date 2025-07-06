@@ -103,11 +103,15 @@ def process_py_file(input_path: Path, environment: str = "default"):
 
   # Extract public dictionary variables
   public_dicts = {}
-  for attr_name in dir(module):
+  for attr_name in module.__dict__:
     if attr_name.startswith("_"):
       continue
+
     attr_value = getattr(module, attr_name)
-    if isinstance(attr_value, dict):
-      public_dicts[attr_name] = attr_value
+
+    if not isinstance(attr_value, dict):
+      continue
+
+    public_dicts[attr_name] = attr_value
 
   return public_dicts if public_dicts else None
