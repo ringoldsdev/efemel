@@ -19,26 +19,26 @@ def get_test_scenarios():
   return [
     {
       "name": "basic",
-      "inputs_dir": test_dir / "inputs_basic",
-      "outputs_dir": test_dir / "outputs_basic",
+      "inputs_dir": test_dir / "inputs/basic",
+      "outputs_dir": test_dir / "outputs/basic",
       "process_args": ["process", "**/*.py", "--out", "output"],
     },
     {
       "name": "basic flattened",
-      "inputs_dir": test_dir / "inputs_basic",
-      "outputs_dir": test_dir / "outputs_basic_flattened",
+      "inputs_dir": test_dir / "inputs/basic",
+      "outputs_dir": test_dir / "outputs/flattened",
       "process_args": ["process", "**/*.py", "--out", "output", "--flatten"],
     },
     {
       "name": "env",
-      "inputs_dir": test_dir / "inputs_with_imports",
-      "outputs_dir": test_dir / "outputs_with_imports",
+      "inputs_dir": test_dir / "inputs/with_imports",
+      "outputs_dir": test_dir / "outputs/with_imports",
       "process_args": ["process", "**/*.py", "--out", "output", "--env", "prod"],
     },
     {
       "name": "basic with hooks",
-      "inputs_dir": test_dir / "inputs_basic",
-      "outputs_dir": test_dir / "outputs_basic_with_hooks",
+      "inputs_dir": test_dir / "inputs/basic",
+      "outputs_dir": test_dir / "outputs/with_hooks",
       "process_args": ["process", "**/*.py", "--out", "output", "--hooks-file", "hooks/output_filename.py"],
     },
   ]

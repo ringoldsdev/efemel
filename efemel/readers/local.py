@@ -10,20 +10,19 @@ class LocalReader:
 
     :param cwd: Optional working directory to set for file operations.
     """
-    self.original_cwd, self.cwd = self.set_cwd(cwd)
 
-  def set_cwd(self, cwd: str | None):
-    original_cwd = os.getcwd()
+    self.original_cwd = Path(os.getcwd())
 
-    if not cwd:
-      return original_cwd, original_cwd
+    if cwd is None:
+      self.cwd_path = self.original_cwd
+      return
 
     cwd_path = Path(cwd)
 
     if not cwd_path.is_absolute():
-      cwd_path = Path(original_cwd) / cwd_path
+      cwd_path = Path(self.original_cwd) / cwd_path
 
-    cwd_path = cwd_path.resolve()
+    self.cwd_path = cwd_path.resolve()
 
     if not cwd_path.exists():
       raise FileNotFoundError(f"Working directory '{cwd}' does not exist")
@@ -31,11 +30,9 @@ class LocalReader:
     if not cwd_path.is_dir():
       raise NotADirectoryError(f"Working directory '{cwd}' is not a directory")
 
-    os.chdir(cwd_path)
-
-    return original_cwd, cwd_path
-
   def read(self, glob_pattern: str):
+    os.chdir(self.cwd_path)
+
     # Check if file_pattern ends with .py
     if not glob_pattern.endswith(".py"):
       raise Exception("File pattern must end with .py to match Python files.")
@@ -50,3 +47,5 @@ class LocalReader:
       if "__init__.py" in file_path:
         continue
       yield Path(file_path)
+
+    os.chdir(self.original_cwd)
