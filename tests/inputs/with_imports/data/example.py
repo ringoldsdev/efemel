@@ -1,1 +1,1 @@
-message = "Hello world"
+from data.message import message

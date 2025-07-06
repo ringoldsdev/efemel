@@ -77,11 +77,11 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks_file):
     click.echo("No files found matching the pattern.")
     return
 
-  def process_single_file(file_path: Path):  # Added type hint for clarity
+  def process_single_file(file_path: Path, cwd: Path):  # Added type hint for clarity
     """Process a single file and return results."""
     try:
       # Always create output file, even if no dictionaries found
-      public_dicts = process_py_file(file_path, env) or {}
+      public_dicts = process_py_file(cwd / file_path, env) or {}
       transformed_data = transformer.transform(public_dicts)
 
       # Original proposed output filename (as a Path object for consistency)
@@ -100,7 +100,7 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks_file):
 
       output_file = writer.write(transformed_data, output_file_path)
 
-      return file_path, output_file, f"Processed: {reader.cwd / file_path} → {output_file}"
+      return file_path, output_file, f"Processed: {cwd / file_path} → {output_file}"
 
     except Exception as e:
       # Ensure the exception message is clear about which file caused the error
@@ -111,7 +111,9 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks_file):
 
   with ThreadPoolExecutor(max_workers=workers) as executor:
     # Submit all tasks
-    future_to_file = {executor.submit(process_single_file, file_path): file_path for file_path in files_to_process}
+    future_to_file = {
+      executor.submit(process_single_file, file_path, reader.cwd_path): file_path for file_path in files_to_process
+    }
     # Process completed tasks as they finish
     processed_count = 0
     for future in as_completed(future_to_file):

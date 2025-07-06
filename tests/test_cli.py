@@ -22,24 +22,28 @@ def get_test_scenarios():
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/basic",
       "process_args": ["process", "**/*.py", "--out", "output"],
+      "hooks": [],
     },
     {
       "name": "basic flattened",
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/flattened",
       "process_args": ["process", "**/*.py", "--out", "output", "--flatten"],
+      "hooks": [],
     },
     {
       "name": "env",
       "inputs_dir": test_dir / "inputs/with_imports",
       "outputs_dir": test_dir / "outputs/with_imports",
       "process_args": ["process", "**/*.py", "--out", "output", "--env", "prod"],
+      "hooks": [],
     },
     {
       "name": "basic with hooks",
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/with_hooks",
       "process_args": ["process", "**/*.py", "--out", "output", "--hooks-file", "hooks/output_filename.py"],
+      "hooks": ["output_filename.py"],
     },
   ]
 
@@ -58,6 +62,7 @@ def test_process_command_comprehensive(scenario):
   inputs_dir = scenario["inputs_dir"]
   outputs_dir = scenario["outputs_dir"]
   process_args = scenario["process_args"]
+  hooks = scenario.get("hooks", [])
 
   with runner.isolated_filesystem():
     # Copy all .py files recursively using glob
@@ -72,19 +77,21 @@ def test_process_command_comprehensive(scenario):
       # Copy the file
       shutil.copy(py_file, target_path)
 
-    # Copy all hooks files if they exist
+    # Copy specified hooks files if they exist
     hooks_dir = Path(__file__).parent / "hooks"
-    if hooks_dir.exists():
-      for hook_file in hooks_dir.glob("*.py"):
-        # Calculate relative path from hooks directory
-        rel_path = hook_file.relative_to(hooks_dir)
-        target_path = Path("hooks") / rel_path
+    if hooks_dir.exists() and hooks:
+      for hook_filename in hooks:
+        hook_file = hooks_dir / hook_filename
+        if hook_file.exists():
+          # Calculate relative path from hooks directory
+          rel_path = hook_file.relative_to(hooks_dir)
+          target_path = Path("hooks") / rel_path
 
-        # Create parent directories if they don't exist
-        target_path.parent.mkdir(parents=True, exist_ok=True)
+          # Create parent directories if they don't exist
+          target_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Copy the file
-        shutil.copy(hook_file, target_path)
+          # Copy the file
+          shutil.copy(hook_file, target_path)
 
     # Run the process command on all Python files recursively
     result = runner.invoke(cli, process_args)
@@ -92,42 +99,22 @@ def test_process_command_comprehensive(scenario):
 
     print(f"Generated files for {scenario_name}: {get_files(Path('output'))}")
 
-    # Special handling for hooks scenario since it creates different structure
-    if scenario_name == "basic with hooks":
-      # For hooks scenario, just verify that files were created with expected transformations
-      generated_files = list(Path("output").glob("**/*.json"))
+    # For other scenarios, compare content of each file with expected outputs
+    for expected_file in outputs_dir.glob("**/*.json"):
+      generated_file = Path("output") / expected_file.relative_to(outputs_dir)
 
-      # Verify at least some files were generated
-      assert len(generated_files) > 0, f"No files generated for scenario '{scenario_name}'"
+      assert generated_file.exists(), f"Generated file {generated_file} not found for scenario '{scenario_name}'"
 
-      # Verify the hooks worked by checking for "test" subdirectory and timestamp in filenames
-      test_subdir_files = list(Path("output/test").glob("**/*.json"))
-      assert len(test_subdir_files) > 0, "No files found in 'test' subdirectory created by hooks"
+      # Load both JSON files
+      with open(generated_file) as f:
+        generated_data = json.load(f)
 
-      # Verify timestamp was added to filenames
-      for generated_file in test_subdir_files:
-        assert "_20250705" in generated_file.stem, f"Timestamp not found in filename: {generated_file.name}"
+      with open(expected_file) as f:
+        expected_data = json.load(f)
 
-      print(f"Hooks test passed: {len(test_subdir_files)} files generated with correct transformations")
-
-    else:
-      # For other scenarios, compare content of each file with expected outputs
-      for file_path in get_files(outputs_dir):
-        generated_file = Path("output") / file_path
-        expected_file = outputs_dir / file_path
-
-        assert generated_file.exists(), f"Generated file {generated_file} not found for scenario '{scenario_name}'"
-
-        # Load both JSON files
-        with open(generated_file) as f:
-          generated_data = json.load(f)
-
-        with open(expected_file) as f:
-          expected_data = json.load(f)
-
-        # Compare the JSON content
-        assert generated_data == expected_data, (
-          f"Content mismatch in {file_path} for scenario '{scenario_name}':\n"
-          f"Generated: {generated_data}\n"
-          f"Expected: {expected_data}"
-        )
+      # Compare the JSON content
+      assert generated_data == expected_data, (
+        f"Content mismatch in {expected_file.relative_to(outputs_dir)} for scenario '{scenario_name}':\n"
+        f"Generated: {generated_data}\n"
+        f"Expected: {expected_data}"
+      )

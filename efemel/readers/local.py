@@ -31,13 +31,11 @@ class LocalReader:
       raise NotADirectoryError(f"Working directory '{cwd}' is not a directory")
 
   def read(self, glob_pattern: str):
-    os.chdir(self.cwd_path)
-
     # Check if file_pattern ends with .py
     if not glob_pattern.endswith(".py"):
       raise Exception("File pattern must end with .py to match Python files.")
 
-    matching_files = glob(glob_pattern, recursive=True)
+    matching_files = glob(glob_pattern, recursive=True, root_dir=str(self.cwd_path))
 
     if not matching_files:
       raise Exception(f"No files found matching pattern: {glob_pattern}")
@@ -47,5 +45,3 @@ class LocalReader:
       if "__init__.py" in file_path:
         continue
       yield Path(file_path)
-
-    os.chdir(self.original_cwd)
