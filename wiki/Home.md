@@ -288,47 +288,45 @@ docker_compose = {
 }
 ```
 
-**Output (`efemel process docker_config.py --out configs/`):**
+**Output (`efemel process docker_config.py --out configs/ --unwrap docker_compose`):**
 
 *docker_config.json:*
 ```json
 {
-  "docker_compose": {
-    "version": "3.8",
-    "services": {
-      "web": {
-        "restart": "unless-stopped",
-        "networks": ["app-network"],
-        "image": "nginx:alpine",
-        "ports": ["80:80"],
-        "logging": {
-          "driver": "json-file",
-          "options": {
-            "max-size": "10m", 
-            "max-file": "3"
-          }
-        },
-        "healthcheck": {
-          "test": ["CMD", "curl", "-f", "http://localhost:8080/health"],
-          "interval": "30s",
-          "timeout": "10s",
-          "retries": 3
+  "version": "3.8",
+  "services": {
+    "web": {
+      "restart": "unless-stopped",
+      "networks": ["app-network"],
+      "image": "nginx:alpine",
+      "ports": ["80:80"],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m", 
+          "max-file": "3"
         }
       },
-      "api": {
-        "restart": "unless-stopped",
-        "networks": ["app-network"],
-        "image": "python:3.12",
-        "ports": ["8080:8080"],
-        "environment": {
-          "DATABASE_URL": "postgresql://localhost/app",
-          "REDIS_URL": "redis://localhost:6379"
-        }
+      "healthcheck": {
+        "test": ["CMD", "curl", "-f", "http://localhost:8080/health"],
+        "interval": "30s",
+        "timeout": "10s",
+        "retries": 3
       }
     },
-    "networks": {
-      "app-network": {"driver": "bridge"}
+    "api": {
+      "restart": "unless-stopped",
+      "networks": ["app-network"],
+      "image": "python:3.12",
+      "ports": ["8080:8080"],
+      "environment": {
+        "DATABASE_URL": "postgresql://localhost/app",
+        "REDIS_URL": "redis://localhost:6379"
+      }
     }
+  },
+  "networks": {
+    "app-network": {"driver": "bridge"}
   }
 }
 ```
@@ -395,6 +393,25 @@ from config import app_config
 <!-- CONFIGURATION_SECTION -->
 ## ⚙️ Configuration
 
+### Quick Examples
+
+```bash
+# Basic usage
+efemel process "**/*.py" --out configs/
+
+# Filter specific keys only
+efemel process config.py --out output/ --pick database --pick logging
+
+# Unwrap nested dictionary contents
+efemel process docker_config.py --out output/ --unwrap docker_compose
+
+# Production environment with custom hooks
+efemel process "src/*.py" --out prod/ --env prod --hooks ./hooks/
+
+# Flatten directory structure with multiple workers
+efemel process "**/*.py" --out flat/ --flatten --workers 8
+```
+
 ### Command-Line Options
 
 | Option | Short | Type | Required | Default | Description |
@@ -406,6 +423,8 @@ from config import app_config
 | `--workers` | `-w` | `int` | No | `CPU_COUNT` | Number of parallel workers |
 | `--hooks` | `-h` | `str` | No | `None` | Path to hooks file or directory |
 | `--flatten` | `-f` | `flag` | No | `False` | Flatten directory structure |
+| `--pick` | `-p` | `str` | No | `None` | Pick specific dictionary keys (can be used multiple times) |
+| `--unwrap` | `-u` | `str` | No | `None` | Extract specific values from dictionaries, merging them (can be used multiple times) |
 
 ### Hook Configuration
 
