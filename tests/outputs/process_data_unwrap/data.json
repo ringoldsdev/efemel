@@ -1,0 +1,10 @@
+{
+  "admin": {
+    "name": "Admin User",
+    "role": "admin"
+  },
+  "guest": {
+    "name": "Guest User",
+    "role": "guest"
+  }
+}

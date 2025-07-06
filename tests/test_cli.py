@@ -51,8 +51,14 @@ def get_test_scenarios():
     {
       "name": "process data - pick",
       "inputs_dir": test_dir / "inputs/process_data",
-      "outputs_dir": test_dir / "outputs/process_data",
+      "outputs_dir": test_dir / "outputs/process_data_pick",
       "process_args": ["--pick", "user_data"],
+    },
+    {
+      "name": "process data - unwrap",
+      "inputs_dir": test_dir / "inputs/process_data",
+      "outputs_dir": test_dir / "outputs/process_data_unwrap",
+      "process_args": ["--unwrap", "user_data"],
     },
   ]
 

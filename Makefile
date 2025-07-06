@@ -67,8 +67,11 @@ generate-test-outputs:
 	@rm -rf tests/outputs/with_hooks_dir
 	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/with_hooks_dir --hooks tests/hooks/multiple
 
-	@rm -rf tests/outputs/with_hooks_dir
-	@uv run efemel process "**/*.py" --cwd tests/inputs/process_data --out tests/outputs/process_data --pick user_data
+	@rm -rf tests/outputs/process_data_pick
+	@uv run efemel process "**/*.py" --cwd tests/inputs/process_data --out tests/outputs/process_data_pick --pick user_data
+
+	@rm -rf tests/outputs/process_data_unwrap
+	@uv run efemel process "**/*.py" --cwd tests/inputs/process_data --out tests/outputs/process_data_unwrap --unwrap user_data
 
 
 # Clean build artifacts and cache files
