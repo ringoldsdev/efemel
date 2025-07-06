@@ -56,7 +56,13 @@ def info():
   multiple=True,
   help="Pick specific dictionary keys to extract (can be used multiple times)",
 )
-def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick):
+@click.option(
+  "--unwrap",
+  "-u",
+  multiple=True,
+  help="Extract specific values from the processed data dictionary, merging them (can be used multiple times)",
+)
+def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap):
   """Process Python files and extract public dictionary variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
@@ -74,6 +80,9 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick):
 
   if pick:
     hooks_manager.add("process_data", process_data_hooks.pick_data(pick))
+
+  if unwrap:
+    hooks_manager.add("process_data", process_data_hooks.unwrap_data(unwrap))
 
   # Load user-defined hooks if a path is specified
   if hooks:
