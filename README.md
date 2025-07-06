@@ -2,7 +2,7 @@
 # Efemel
 
 <!-- PROJECT_TAGLINE -->
-**Python turned into a functional markup language. Also what I've said thousands of times while working with yaml.**
+**Python as a functional markup language. Solves YAML scaling issues.**
 
 <!-- BADGES_SECTION -->
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -15,93 +15,66 @@
 <!-- INTRODUCTION_SECTION -->
 ## 🎯 Overview
 
-**Efemel** is a configuration management tool that replaces complex markup templating with native Python syntax. Instead of wrestling with YAML templating engines, custom DSLs, or markup languages that don't scale, Efemel lets you write configurations in Python and export them to any format you need.
+**Efemel** replaces markup templating with native Python. Solves configuration scaling issues without DSLs.
 
-**Pain Points Solved:**
-- **YAML at Scale:** Plain YAML becomes unmaintainable for complex configurations (1000+ line files, deep nesting)
-- **Templating Hell:** Tools like Helm, Jinja2, or Jsonnet require learning custom DSLs with poor tooling
-- **Zero Validation:** Markup languages provide no built-in validation, type checking, or IDE support
-- **Runtime-Only Errors:** Syntax and logic errors only discovered during deployment, not development
-- **Limited Logic:** Complex conditionals, loops, and transformations are impossible or unreadable in markup
-- **Copy-Paste Culture:** Configuration duplication across environments leads to drift and maintenance nightmares
+**Why Python:**
+- Native syntax instead of templating DSLs
+- Built-in validation and IDE support
+- Full programming capabilities
+- Testable configurations
 
-**Why Python for Configuration:**
-- **Native Language:** Use familiar Python syntax instead of learning templating DSLs or custom languages
-- **Built-in Validation:** Leverage Python's type system, IDE autocomplete, and linting for immediate feedback
-- **Full Programming Power:** Complex logic, imports, functions, classes - everything Python offers
-- **Excellent Tooling:** IDE support, debugging, unit testing, version control, and code review workflows
-- **Instant Feedback:** Syntax errors, type issues, and logic problems caught during development, not deployment
-- **Reusable Components:** Create shared libraries of configuration components with proper imports and modules
-
-**Primary Use Cases:**
-- **CI/CD Pipelines:** Generate GitHub Actions, GitLab CI, or Jenkins workflows with complex logic and conditions
-- **Workflows:** AWS Step Functions, Google Cloud Workflows, Azure Logic Apps with dynamic state machines
-- **Infrastructure as Code:** Terraform, CloudFormation, or ARM templates with environment-specific resources
-- **Docker Compose:** Multi-service applications with environment-specific configurations and overrides
-- **Application Config:** API settings, database connections, feature flags across dev/staging/prod environments
+**Use Cases:**
+- CI/CD pipelines
+- Infrastructure as Code
+- Workflow definitions
+- Docker Compose configs
+- Application settings
 
 ---
 
 <!-- FEATURES_SECTION -->
-## ✨ Features & Capabilities
+## ✨ Features
 
-### Core Functionality
-- **Python-Native Configuration:** Write configs in Python instead of learning templating languages
-- **Multi-Format Export:** Generate JSON, YAML, TOML, or any structured format
-- **Structure Preservation:** Maintains source directory hierarchy in output
-- **Parallel Processing:** Multi-threaded processing for large configuration projects
-- **Glob Pattern Support:** Flexible file selection with Unix-style patterns
-- **IDE Integration:** Full autocomplete, type checking, and error detection during development
+### Core
+- Python-native configuration
+- Multi-format export (JSON/YAML/TOML)
+- Directory structure preservation
+- Parallel processing
+- Glob pattern support
+- IDE integration
 
-### Advanced Features  
-- **Environment-Specific Processing:** Different configs per environment without templating (`--env prod`)
-- **Extensible Hook System:** Custom transformation pipeline for output formatting
-- **Auto-Validation:** Leverage Python's type system and IDE validation
-- **Zero Configuration:** Works out-of-the-box with sensible defaults
-- **Testable Configurations:** Unit test your configs like any Python code
-- **Live Reload:** Instant feedback loop - see configuration changes immediately
+### Advanced  
+- Environment-specific processing
+- Extensible hook system
+- Auto-validation
+- Testable configurations
+- Live reload
 
 ---
 
 <!-- INSTALLATION_SECTION -->
-## 📦 Installation & Setup
+## 📦 Installation
 
-To be filled out once it gets compiled and released.
+To be filled out once compiled and released.
 
 ---
 
 <!-- USAGE_SECTION -->
-## 🚀 Usage Examples
+## 🚀 Usage
 
-### Basic Usage
-
-#### Single File Processing
+### Basic
 ```bash
-# Extract dictionaries from one file
+# Single file
 efemel process config.py --out output/
-```
 
-#### Batch Processing
-```bash
-# Process all Python files recursively
+# Batch processing
 efemel process "**/*.py" --out exported_configs/
 
-# Process specific directory
-efemel process "src/config/*.py" --out configs/
-```
+# Pick specific keys
+efemel process "**/*.py" --out output/ --pick result
 
-#### Picking values for output
-```bash
-# Picks only the result key-value pair for the output
-efemel process "**/*.py" --out exported_configs/ --pick result
-
-
-#### Unwrap values before output
-```bash
-# Takes data from the result property and outputs contents as the final output
-efemel process "**/*.py" --out exported_configs/ --unwrap result
-```
-
+# Unwrap values
+efemel process "**/*.py" --out output/ --unwrap result
 ### Advanced Usage
 
 #### Environment-Specific Processing
@@ -115,6 +88,8 @@ efemel process "config/**/*.py" --out dev_config/ --env dev
 # Staging with custom working directory
 efemel process "*.py" --cwd /app/configs --out staging/ --env staging
 ```
+
+### Advanced
 
 #### Performance Tuning
 ```bash
