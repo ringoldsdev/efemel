@@ -42,11 +42,17 @@ def get_test_scenarios():
       "hooks": ["before_after/output_filename.py"],
     },
     {
-      "name": "hooks-dir",
+      "name": "hooks dir",
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/with_hooks_dir",
       "process_args": ["--hooks", "hooks/multiple"],
       "hooks": ["multiple/output_filename.py"],
+    },
+    {
+      "name": "process data - pick",
+      "inputs_dir": test_dir / "inputs/process_data",
+      "outputs_dir": test_dir / "outputs/process_data",
+      "process_args": ["--pick", "user_data"],
     },
   ]
 
