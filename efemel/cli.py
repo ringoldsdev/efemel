@@ -44,12 +44,12 @@ def info():
   help=f"Number of parallel workers (default: {DEFAULT_WORKERS})",
 )
 @click.option(
-  "--hooks-file",
+  "--hooks",
   "-h",
-  type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
-  help="Path to a Python file containing user-defined hooks.",
+  type=click.Path(exists=True, readable=True, resolve_path=True),
+  help="Path to a Python file or directory containing user-defined hooks.",
 )
-def process(file_pattern, out, flatten, cwd, env, workers, hooks_file):
+def process(file_pattern, out, flatten, cwd, env, workers, hooks):
   """Process Python files and extract public dictionary variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
@@ -65,10 +65,16 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks_file):
     # Add the flatten_output_path hook to the hooks manager
     hooks_manager.add("output_filename", flatten_output_path)
 
-  # Load user-defined hooks if a file is specified
-  if hooks_file:
-    hooks_manager.load_user_file(hooks_file)
-    click.echo(f"User hooks loaded from: {hooks_file}")
+  # Load user-defined hooks if a path is specified
+  if hooks:
+    if os.path.isfile(hooks):
+      hooks_manager.load_user_file(hooks)
+      click.echo(f"User hooks loaded from file: {hooks}")
+    elif os.path.isdir(hooks):
+      hooks_manager.load_hooks_directory(hooks)
+      click.echo(f"User hooks loaded from directory: {hooks}")
+    else:
+      click.echo(f"Warning: Hooks path '{hooks}' is neither a file nor a directory")
 
   hooks_manager.add("output_filename", ensure_output_path)
 

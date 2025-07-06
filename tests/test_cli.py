@@ -38,7 +38,14 @@ def get_test_scenarios():
       "name": "hooks",
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/with_hooks",
-      "process_args": ["--hooks-file", "hooks/output_filename.py"],
+      "process_args": ["--hooks", "hooks/output_filename.py"],
+      "hooks": ["output_filename.py"],
+    },
+    {
+      "name": "hooks-dir",
+      "inputs_dir": test_dir / "inputs/basic",
+      "outputs_dir": test_dir / "outputs/with_hooks",
+      "process_args": ["--hooks", "hooks"],
       "hooks": ["output_filename.py"],
     },
   ]

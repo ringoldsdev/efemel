@@ -18,12 +18,15 @@ class HooksManager:
     """
     Dynamically imports a Python module from a given file path
     and registers all functions in that module as hooks.
+    The hook name is derived from the filename (without .py extension).
     """
     if not os.path.exists(file_path):
       print(f"Error: Hooks file not found at '{file_path}'")
       return
 
     module_name = os.path.basename(file_path).replace(".py", "")
+    # Use the filename (without extension) as the hook name
+    hook_name = module_name
 
     spec = importlib.util.spec_from_file_location(module_name, file_path)
 
@@ -41,7 +44,10 @@ class HooksManager:
       sys.modules[module_name] = module
       print(f"Successfully loaded hooks module: {module_name} from {file_path}")
 
-      # Register all functions in the module as hooks
+      # Register all functions in the module as hooks for the hook_name
+      functions_found = []
+      before_functions_found = []
+
       for attr_name in module.__dict__:
         if attr_name.startswith("_"):  # Skip private/dunder methods
           continue
@@ -52,16 +58,54 @@ class HooksManager:
 
         # Check if it's a before hook
         if attr_name.startswith("before_"):
-          # Extract the hook name by removing the "before_" prefix
-          hook_name = attr_name[7:]  # Remove "before_" prefix
           self.add_before(hook_name, attr_value)
+          before_functions_found.append(attr_name)
           print(f"Registered function '{attr_name}' as before hook for '{hook_name}'.")
         else:
-          self.add(attr_name, attr_value)
-          print(f"Registered function '{attr_name}' as hook.")
+          self.add(hook_name, attr_value)
+          functions_found.append(attr_name)
+          print(f"Registered function '{attr_name}' as hook for '{hook_name}'.")
+
+      if functions_found or before_functions_found:
+        total_before = len(before_functions_found)
+        total_regular = len(functions_found)
+        print(f"Hook '{hook_name}' now has {total_before} before function(s) and {total_regular} regular function(s).")
+      else:
+        print(f"No callable functions found in {file_path}")
 
     except Exception as e:
       print(f"Error loading hooks from {file_path}: {e}")
+
+  def load_hooks_directory(self, hooks_dir: str):
+    """
+    Load all Python files from a hooks directory.
+    Each .py file in the directory will be loaded as a separate hook module.
+
+    Args:
+      hooks_dir: Path to the directory containing hook files
+    """
+    if not os.path.exists(hooks_dir):
+      print(f"Error: Hooks directory not found at '{hooks_dir}'")
+      return
+
+    if not os.path.isdir(hooks_dir):
+      print(f"Error: '{hooks_dir}' is not a directory")
+      return
+
+    # Find all .py files in the hooks directory
+    hook_files = []
+    for filename in os.listdir(hooks_dir):
+      if filename.endswith(".py") and not filename.startswith("_"):
+        hook_files.append(os.path.join(hooks_dir, filename))
+
+    if not hook_files:
+      print(f"No hook files found in directory '{hooks_dir}'")
+      return
+
+    print(f"Loading {len(hook_files)} hook file(s) from directory '{hooks_dir}':")
+    for hook_file in hook_files:  # Sort for consistent loading order
+      print(f"  Loading: {os.path.basename(hook_file)}")
+      self.load_user_file(hook_file)
 
   def call(self, hook_name: str, context: dict[str, Any], return_params: list[str]) -> dict[str, Any] | tuple[Any, ...]:
     """
