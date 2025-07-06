@@ -101,17 +101,15 @@ def process_py_file(input_path: Path, environment: str = "default"):
       sys.modules[module_name] = original_module_in_sys
     sys.path = original_sys_path
 
-  # Extract public dictionary variables
-  public_dicts = {}
-  for attr_name in module.__dict__:
-    if attr_name.startswith("_"):
-      continue
+  # Extract all dictionary variables from module
+  all_dicts = {}
 
+  for attr_name in module.__dict__:
     attr_value = getattr(module, attr_name)
 
     if not isinstance(attr_value, dict):
       continue
 
-    public_dicts[attr_name] = attr_value
+    all_dicts[attr_name] = attr_value
 
-  return public_dicts if public_dicts else None
+  return all_dicts

@@ -78,6 +78,8 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap):
     # Add the flatten_output_path hook to the hooks manager
     hooks_manager.add("output_filename", output_filename.flatten_output_path)
 
+  hooks_manager.add("process_data", process_data_hooks.skip_private_properties)
+
   if pick:
     hooks_manager.add("process_data", process_data_hooks.pick_data(pick))
 

@@ -1,3 +1,21 @@
+def skip_private_properties(context):
+  """
+  Filter out private properties (those starting with underscore) from the data.
+
+  Args:
+      context: Hook context containing 'data' key with the extracted module data
+  """
+  data = context.get("data", {})
+
+  # Filter out private properties (starting with underscore)
+  filtered_data = {}
+  for attr_name, attr_value in data.items():
+    if not attr_name.startswith("_"):
+      filtered_data[attr_name] = attr_value
+
+  context["data"] = filtered_data
+
+
 def pick_data(keys):
   """Pick specific keys from the processed python file."""
 
