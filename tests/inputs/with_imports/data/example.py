@@ -1,1 +1,1 @@
-from data.message import message
+from data.message import message  # noqa: F401
