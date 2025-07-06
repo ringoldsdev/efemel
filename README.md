@@ -90,6 +90,18 @@ efemel process "**/*.py" --out exported_configs/
 efemel process "src/config/*.py" --out configs/
 ```
 
+#### Picking values for output
+```bash
+# Picks only the result key-value pair for the output
+efemel process "**/*.py" --out exported_configs/ --pick result
+
+
+#### Unwrap values before output
+```bash
+# Takes data from the result property and outputs contents as the final output
+efemel process "**/*.py" --out exported_configs/ --unwrap result
+```
+
 ### Advanced Usage
 
 #### Environment-Specific Processing
@@ -331,86 +343,10 @@ docker_compose = {
 }
 ```
 
-### Compare: Traditional YAML vs. Efemel Approach
-
-#### ❌ Traditional YAML + Templating
-```yaml
-# app-config-prod.yaml
-app_name: "{{ .AppName }}"
-log_level: {{ if eq .Environment "prod" }}"INFO"{{ else }}"DEBUG"{{ end }}
-workers: {{ if eq .Environment "prod" }}8{{ else if eq .Environment "dev" }}1{{ else }}2{{ end }}
-{{- if eq .Environment "prod" }}
-monitoring_enabled: true
-{{- end }}
-
-# app-config-dev.yaml (separate file with duplication)
-app_name: "{{ .AppName }}"
-log_level: "DEBUG"
-workers: 1
-
-# values-prod.yaml, values-dev.yaml (more files to maintain)
-AppName: "api-server"
-Environment: "prod"
-```
-
-**Problems:**
-- **No validation** until runtime deployment
-- **Complex templating** syntax that's hard to read and debug
-- **Multiple files** for each environment with copy-paste duplication
-- **Learning curve** for templating language
-- **Runtime-only errors** - broken templates discovered during deployment
-
-#### ✅ Efemel Python Approach
-```python
-# config.py (default)
-app_config = {
-    "app_name": "api-server",
-    "log_level": "INFO",
-    "workers": 2
-}
-
-# config.prod.py (production override)
-app_config = {
-    "app_name": "api-server", 
-    "log_level": "INFO",
-    "workers": 8,
-    "monitoring_enabled": True
-}
-
-# main.py (imports based on --env flag)
-from config import app_config
-```
-
-**Benefits:**
-- **Immediate validation** with Python type hints and IDE support
-- **Full IDE support** - autocomplete, refactoring, debugging
-- **Unit testable** configuration logic
-- **Standard Python** - no new syntax to learn
-- **Instant feedback** during development
-
 ---
 
 <!-- CONFIGURATION_SECTION -->
 ## ⚙️ Configuration
-
-### Quick Examples
-
-```bash
-# Basic usage
-efemel process "**/*.py" --out configs/
-
-# Filter specific keys only
-efemel process config.py --out output/ --pick database --pick logging
-
-# Unwrap nested dictionary contents
-efemel process docker_config.py --out output/ --unwrap docker_compose
-
-# Production environment with custom hooks
-efemel process "src/*.py" --out prod/ --env prod --hooks ./hooks/
-
-# Flatten directory structure with multiple workers
-efemel process "**/*.py" --out flat/ --flatten --workers 8
-```
 
 ### Command-Line Options
 
@@ -447,14 +383,6 @@ def add_timestamp(context):
 ## 📄 License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
-### License Summary
-- **Commercial Use:** Permitted
-- **Modification:** Permitted  
-- **Distribution:** Permitted
-- **Private Use:** Permitted
-- **Liability:** Not provided
-- **Warranty:** Not provided
 
 ---
 
