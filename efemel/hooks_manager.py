@@ -173,17 +173,3 @@ class HooksManager:
       Number of functions registered for this hook
     """
     return len(self.hooks.get(hook_name, []))
-
-
-# Global instance for backward compatibility
-hooks_manager = HooksManager()
-
-# Expose the instance methods for backward compatibility
-load_user_hooks_file = hooks_manager.load_user_file
-call_hook = hooks_manager.call
-add_hook = hooks_manager.add
-add_before_hook = hooks_manager.add_before
-remove_hook = hooks_manager.remove
-clear_hooks = hooks_manager.clear
-list_hooks = hooks_manager.list
-get_hook_count = hooks_manager.get_count

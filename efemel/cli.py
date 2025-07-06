@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 
 from efemel.hooks.output_filename import ensure_output_path, flatten_output_path
-from efemel.hooks_manager import hooks_manager
+from efemel.hooks_manager import HooksManager
 from efemel.process import process_py_file
 from efemel.readers.local import LocalReader
 from efemel.transformers.json import JSONTransformer
@@ -54,6 +54,8 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks_file):
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
   """
+
+  hooks_manager = HooksManager()
 
   reader = LocalReader(cwd)
   transformer = JSONTransformer()
