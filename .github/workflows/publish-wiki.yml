@@ -1,0 +1,41 @@
+name: Publish Wiki
+
+# Only run on pushes to main branch
+on:
+  push:
+    branches: [main]
+    paths:
+      - wiki/**
+      - .github/workflows/publish-wiki.yml
+
+# Prevent multiple wiki deployments from running simultaneously
+concurrency:
+  group: publish-wiki
+  cancel-in-progress: true
+
+# Required permissions to push to the wiki
+permissions:
+  contents: write
+
+jobs:
+  publish-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Publish to GitHub Wiki
+        uses: Andrew-Chen-Wang/github-wiki-action@v4
+        with:
+          # Use the default path 'wiki/' 
+          path: wiki/
+          # Use default token with contents: write permission
+          token: ${{ github.token }}
+          # Default strategy is 'clone' which preserves history
+          strategy: clone
+          # Enable preprocessing to convert README.md to Home.md and fix links
+          preprocess: true
+          # Don't create empty commits if no changes
+          disable-empty-commits: true
+          # Custom commit message
+          commit-message: "Update wiki from main branch (${{ github.sha }})"
