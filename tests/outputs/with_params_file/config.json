@@ -1,0 +1,70 @@
+{
+  "app_name": "params-file-app",
+  "version": "2.1.0",
+  "debug_mode": false,
+  "port": 9090,
+  "memory_mb": 1024,
+  "database_config": {
+    "host": "params-file-db",
+    "port": 5432,
+    "ssl": true,
+    "pool_size": 10
+  },
+  "api_endpoints": [
+    "https://api.example.com",
+    "https://api-backup.example.com"
+  ],
+  "timeout_seconds": 30,
+  "max_retries": 3,
+  "cache_ttl": 1800,
+  "main_config": {
+    "app_name": "params-file-app",
+    "version": "2.1.0",
+    "debug": false,
+    "port": 9090,
+    "memory_mb": 1024,
+    "cache_ttl": 1800
+  },
+  "db_settings": {
+    "host": "params-file-db",
+    "port": 5432,
+    "ssl": true,
+    "pool_size": 10,
+    "timeout": 30
+  },
+  "api_config": {
+    "endpoints": [
+      "https://api.example.com",
+      "https://api-backup.example.com"
+    ],
+    "timeout": 30,
+    "max_retries": 3,
+    "default_endpoint": "https://api.example.com"
+  },
+  "app_configuration": {
+    "main": {
+      "app_name": "params-file-app",
+      "version": "2.1.0",
+      "debug": false,
+      "port": 9090,
+      "memory_mb": 1024,
+      "cache_ttl": 1800
+    },
+    "database": {
+      "host": "params-file-db",
+      "port": 5432,
+      "ssl": true,
+      "pool_size": 10,
+      "timeout": 30
+    },
+    "api": {
+      "endpoints": [
+        "https://api.example.com",
+        "https://api-backup.example.com"
+      ],
+      "timeout": 30,
+      "max_retries": 3,
+      "default_endpoint": "https://api.example.com"
+    }
+  }
+}

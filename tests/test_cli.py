@@ -39,14 +39,14 @@ def get_test_scenarios():
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/with_hooks",
       "process_args": ["--hooks", "hooks/before_after/output_filename.py"],
-      "hooks": ["before_after/output_filename.py"],
+      "assets": ["hooks/before_after/output_filename.py"],
     },
     {
       "name": "hooks dir",
       "inputs_dir": test_dir / "inputs/basic",
       "outputs_dir": test_dir / "outputs/with_hooks_dir",
       "process_args": ["--hooks", "hooks/multiple"],
-      "hooks": ["multiple/output_filename.py"],
+      "assets": ["hooks/multiple/output_filename.py"],
     },
     {
       "name": "process data - pick",
@@ -65,13 +65,29 @@ def get_test_scenarios():
       "inputs_dir": test_dir / "inputs/with_params",
       "outputs_dir": test_dir / "outputs/with_params",
       "process_args": [
-        "--param", "app_name=myapp",
-        "--param", "version=2.0.0",
-        "--param", "debug_mode=true",
-        "--param", "port=8080",
-        "--param", 'database_config={"host":"prod-db","port":5432}',
-        "--param", "memory_mb=512"
+        "--param",
+        "app_name=myapp",
+        "--param",
+        "version=2.0.0",
+        "--param",
+        "debug_mode=true",
+        "--param",
+        "port=8080",
+        "--param",
+        'database_config={"host":"prod-db","port":5432}',
+        "--param",
+        "memory_mb=512",
       ],
+    },
+    {
+      "name": "with params file",
+      "inputs_dir": test_dir / "inputs/with_params_file",
+      "outputs_dir": test_dir / "outputs/with_params_file",
+      "process_args": [
+        "--params-file",
+        "params/params.py",
+      ],
+      "assets": ["params/params.py"],
     },
   ]
 
@@ -90,7 +106,7 @@ def test_process_command_comprehensive(scenario):
   inputs_dir = scenario["inputs_dir"]
   outputs_dir = scenario["outputs_dir"]
   additional_args = scenario.get("process_args", [])
-  hooks = scenario.get("hooks", [])
+  assets = scenario.get("assets", [])
 
   # Build complete process arguments
   process_args = ["process", "**/*.py", "--out", "output"] + additional_args
@@ -109,20 +125,15 @@ def test_process_command_comprehensive(scenario):
       shutil.copy(py_file, target_path)
 
     # Copy specified hooks files if they exist
-    hooks_dir = Path(__file__).parent / "hooks"
-    if hooks_dir.exists() and hooks:
-      for hook_filename in hooks:
-        hook_file = hooks_dir / hook_filename
-        if hook_file.exists():
-          # Calculate relative path from hooks directory
-          rel_path = hook_file.relative_to(hooks_dir)
-          target_path = Path("hooks") / rel_path
-
-          # Create parent directories if they don't exist
-          target_path.parent.mkdir(parents=True, exist_ok=True)
-
-          # Copy the file
-          shutil.copy(hook_file, target_path)
+    test_dir = Path(__file__).parent
+    for hook_filename in assets:
+      hook_path = test_dir / hook_filename
+      if hook_path.exists():
+        target_hook_path = Path(hook_filename)
+        # Create parent directories if they don't exist
+        target_hook_path.parent.mkdir(parents=True, exist_ok=True)
+        # Copy the file
+        shutil.copy(hook_path, target_hook_path)
 
     # Run the process command on all Python files recursively
     result = runner.invoke(cli, process_args)
