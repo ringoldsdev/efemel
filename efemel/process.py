@@ -106,6 +106,21 @@ def process_py_file(input_path: Path, environment: str = "default", custom_param
 
   try:
     spec.loader.exec_module(module)
+  except NameError as e:
+    # Clean up sys.modules and sys.path before raising
+    if original_module_in_sys is None:
+      sys.modules.pop(module_name, None)
+    else:
+      sys.modules[module_name] = original_module_in_sys
+    sys.path = original_sys_path
+
+    # Extract parameter name from the NameError message
+    error_msg = str(e)
+    if "is not defined" in error_msg:
+      param_name = error_msg.split("'")[1] if "'" in error_msg else "unknown"
+      raise Exception(f"Missing parameter: {param_name}. Use --param {param_name}=value to pass parameters") from e
+    else:
+      raise Exception(f"Missing parameter: {error_msg}. Use --param to pass parameters") from e
   finally:
     # Clean up sys.modules and sys.path
     if original_module_in_sys is None:
