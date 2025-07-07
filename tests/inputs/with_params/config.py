@@ -10,7 +10,7 @@ app_config = {
 
 # Test complex parameter (JSON object)
 if "database_config" in globals():
-  database = database_config
+  database = database_config  # noqa: F821
 else:
   database = {"host": "localhost", "port": 5432}
 

@@ -8,18 +8,10 @@ port = 9090
 memory_mb = 1024
 
 # Complex configuration
-database_config = {
-    "host": "params-file-db",
-    "port": 5432,
-    "ssl": True,
-    "pool_size": 10
-}
+database_config = {"host": "params-file-db", "port": 5432, "ssl": True, "pool_size": 10}
 
 # Environment-specific settings
-api_endpoints = [
-    "https://api.example.com",
-    "https://api-backup.example.com"
-]
+api_endpoints = ["https://api.example.com", "https://api-backup.example.com"]
 
 # Computed values
 timeout_seconds = 30
