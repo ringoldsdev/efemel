@@ -52,32 +52,15 @@ test:
 
 # Generate expected test outputs from test inputs
 generate-test-outputs:
-	@rm -rf tests/outputs_basic
-	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/basic
-
-	@rm -rf tests/outputs_with_imports
-	@uv run efemel process "*.py" --cwd tests/inputs/with_imports --out tests/outputs/with_imports --env prod
-
-	@rm -rf tests/outputs_basic_flattened
-	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/flattened --flatten
-
-	@rm -rf tests/outputs_basic_with_hooks
-	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/with_hooks --hooks tests/hooks/before_after/output_filename.py
-
-	@rm -rf tests/outputs/with_hooks_dir
-	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/with_hooks_dir --hooks tests/hooks/multiple
-
-	@rm -rf tests/outputs/process_data_pick
-	@uv run efemel process "**/*.py" --cwd tests/inputs/process_data --out tests/outputs/process_data_pick --pick user_data
-
-	@rm -rf tests/outputs/process_data_unwrap
-	@uv run efemel process "**/*.py" --cwd tests/inputs/process_data --out tests/outputs/process_data_unwrap --unwrap user_data
-
-	@rm -rf tests/outputs/with_params
-	@uv run efemel process "**/*.py" --cwd tests/inputs/with_params --out tests/outputs/with_params --param app_name=myapp --param version=2.0.0 --param debug_mode=true --param port=8080 --param 'database_config={"host":"prod-db","port":5432}' --param memory_mb=512
-
-	@rm -rf tests/outputs/with_params_file
-	@uv run efemel process "config.py" --cwd tests/inputs/with_params_file --out tests/outputs/with_params_file --params-file tests/params/params.py
+	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/basic --clean
+	@uv run efemel process "*.py" --cwd tests/inputs/with_imports --out tests/outputs/with_imports --env prod --clean
+	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/flattened --flatten --clean
+	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/with_hooks --hooks tests/hooks/before_after/output_filename.py --clean
+	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/with_hooks_dir --hooks tests/hooks/multiple --clean
+	@uv run efemel process "**/*.py" --cwd tests/inputs/process_data --out tests/outputs/process_data_pick --pick user_data --clean
+	@uv run efemel process "**/*.py" --cwd tests/inputs/process_data --out tests/outputs/process_data_unwrap --unwrap user_data --clean
+	@uv run efemel process "**/*.py" --cwd tests/inputs/with_params --out tests/outputs/with_params --param app_name=myapp --param version=2.0.0 --param debug_mode=true --param port=8080 --param 'database_config={"host":"prod-db","port":5432}' --param memory_mb=512 --clean
+	@uv run efemel process "config.py" --cwd tests/inputs/with_params_file --out tests/outputs/with_params_file --params-file tests/params/params.py --clean
 
 
 # Clean build artifacts and cache files

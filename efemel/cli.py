@@ -1,4 +1,5 @@
 import os
+import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -73,7 +74,13 @@ def info():
   type=click.Path(exists=True, readable=True, resolve_path=True),
   help="Path to a Python file that will be processed to extract parameters for other files",
 )
-def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap, param, params_file):
+@click.option(
+  "--clean",
+  is_flag=True,
+  default=False,
+  help="Clean (delete) the output directory before processing",
+)
+def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap, param, params_file, clean):
   """Process Python files and extract serializable variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
@@ -159,6 +166,17 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap, 
   if not files_to_process:
     click.echo("No files found matching the pattern.")
     return
+
+  # Clean output directory if requested
+  output_path = Path(out)
+  if clean:
+    if output_path.exists():
+      click.echo(f"Cleaning output directory: {output_path}")
+      shutil.rmtree(output_path)
+      click.echo("Output directory cleaned successfully.")
+
+  # Ensure the output directory exists for writing
+  output_path.mkdir(parents=True, exist_ok=True)
 
   def process_single_file(file_path: Path, cwd: Path):  # Added type hint for clarity
     """Process a single file and return results."""
