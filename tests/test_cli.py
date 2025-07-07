@@ -60,6 +60,19 @@ def get_test_scenarios():
       "outputs_dir": test_dir / "outputs/process_data_unwrap",
       "process_args": ["--unwrap", "user_data"],
     },
+    {
+      "name": "with params",
+      "inputs_dir": test_dir / "inputs/with_params",
+      "outputs_dir": test_dir / "outputs/with_params",
+      "process_args": [
+        "--param", "app_name=myapp",
+        "--param", "version=2.0.0",
+        "--param", "debug_mode=true",
+        "--param", "port=8080",
+        "--param", 'database_config={"host":"prod-db","port":5432}',
+        "--param", "memory_mb=512"
+      ],
+    },
   ]
 
 

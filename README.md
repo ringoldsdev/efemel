@@ -106,9 +106,93 @@ efemel process "**/*.py" --out output/ --workers 1
 efemel process "**/*.py" --out output/ --hooks hooks/
 ```
 
+#### Parameter Injection
+```bash
+# Pass parameters to Python scripts during processing
+efemel process "config.py" --out output/ --param app_name=myapp --param version=2.0.0 --param debug_mode=true
+
+# Use JSON for complex parameters
+efemel process "config.py" --out output/ --param 'database_config={"host":"prod-db","port":5432}'
+
+# Multiple parameters
+efemel process "**/*.py" --out output/ \
+  --param app_name=myapp \
+  --param version=2.0.0 \
+  --param debug_mode=true \
+  --param port=8080 \
+  --param environment=production
+```
+
 ### Core Patterns & Examples
 
-#### Pattern 1: Basic Data Extraction
+#### Pattern 1: Parameter Injection
+
+**Input (`config.py`):**
+```python
+# Parameters are injected as global variables
+app_config = {
+    "name": globals().get("app_name", "default-app"),
+    "version": globals().get("version", "1.0.0"),
+    "debug": globals().get("debug_mode", False),
+    "port": globals().get("port", 3000),
+}
+
+# Direct usage (will raise NameError if not provided)
+try:
+    database_config = {
+        "host": db_host,
+        "port": db_port,
+        "database": db_name,
+    }
+except NameError:
+    database_config = {
+        "host": "localhost",
+        "port": 5432,
+        "database": "mydb",
+    }
+
+# Complex parameters (JSON objects)
+if "redis_config" in globals():
+    cache_config = globals()["redis_config"]
+else:
+    cache_config = {"host": "localhost", "port": 6379}
+```
+
+**Command:**
+```bash
+efemel process config.py --out output/ \
+  --param app_name=myapp \
+  --param version=2.0.0 \
+  --param debug_mode=true \
+  --param port=8080 \
+  --param db_host=prod-db \
+  --param db_port=5432 \
+  --param db_name=mydb \
+  --param 'redis_config={"host":"redis-server","port":6379}'
+```
+
+**Output:**
+```json
+{
+  "app_config": {
+    "name": "myapp",
+    "version": "2.0.0",
+    "debug": true,
+    "port": 8080
+  },
+  "database_config": {
+    "host": "prod-db",
+    "port": 5432,
+    "database": "mydb"
+  },
+  "cache_config": {
+    "host": "redis-server",
+    "port": 6379
+  }
+}
+```
+
+#### Pattern 2: Basic Data Extraction
 
 **Input (`app_config.py`):**
 ```python
@@ -159,7 +243,7 @@ import os  # This won't be extracted
 }
 ```
 
-#### Pattern 2: Environment-Specific File Overrides
+#### Pattern 3: Environment-Specific File Overrides
 
 **Input Files:**
 
@@ -225,7 +309,7 @@ application = {
 }
 ```
 
-#### Pattern 3: Composable Configuration Parts
+#### Pattern 4: Composable Configuration Parts
 
 **Input (`docker_config.py`):**
 ```python
@@ -345,6 +429,7 @@ docker_compose = {
 | `--flatten` | `-f` | `flag` | No | `False` | Flatten directory structure |
 | `--pick` | `-p` | `str` | No | `None` | Pick specific keys from the extracted data (can be used multiple times) |
 | `--unwrap` | `-u` | `str` | No | `None` | Extract specific values from the processed data, merging them (can be used multiple times) |
+| `--param` | `-P` | `str` | No | `None` | Pass custom parameters to processed scripts in key=value format (can be used multiple times) |
 
 ### Hook Configuration
 

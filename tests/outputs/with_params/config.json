@@ -1,0 +1,23 @@
+{
+  "app_name": "myapp",
+  "version": "2.0.0",
+  "debug_mode": true,
+  "port": 8080,
+  "database_config": {
+    "host": "prod-db",
+    "port": 5432
+  },
+  "memory_mb": 512,
+  "app_config": {
+    "name": "myapp",
+    "version": "2.0.0",
+    "debug": true,
+    "port": 8080
+  },
+  "database": {
+    "host": "prod-db",
+    "port": 5432
+  },
+  "max_connections": 100,
+  "total_memory": 536870912
+}
