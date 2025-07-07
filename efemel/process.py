@@ -51,13 +51,21 @@ def set_dynamic_import_environment(environment: str):
   sys.meta_path.insert(0, EnvironmentModuleFinder(environment))
 
 
-def process_py_file(input_path: Path, environment: str = "default"):
+def process_py_file(input_path: Path, environment: str = "default", custom_params: dict = None):
   """
   This function processes a Python file *exactly as specified by input_path*.
   It does NOT apply environment-specific logic to the input_path itself.
   Any 'import' statements *within* the loaded file will be subject to
   the dynamic import environment set by `set_dynamic_import_environment`.
+
+  Args:
+    input_path: Path to the Python file to process
+    environment: Environment name for dynamic imports
+    custom_params: Dictionary of custom parameters to inject into the module
   """
+
+  if custom_params is None:
+    custom_params = {}
 
   set_dynamic_import_environment(environment)
 
@@ -91,8 +99,28 @@ def process_py_file(input_path: Path, environment: str = "default"):
   original_module_in_sys = sys.modules.get(module_name)
   sys.modules[module_name] = module
 
+  # Inject custom parameters into the module's namespace
+  # This makes them available as global variables in the processed script
+  for param_name, param_value in custom_params.items():
+    setattr(module, param_name, param_value)
+
   try:
     spec.loader.exec_module(module)
+  except NameError as e:
+    # Clean up sys.modules and sys.path before raising
+    if original_module_in_sys is None:
+      sys.modules.pop(module_name, None)
+    else:
+      sys.modules[module_name] = original_module_in_sys
+    sys.path = original_sys_path
+
+    # Extract parameter name from the NameError message
+    error_msg = str(e)
+    if "is not defined" in error_msg:
+      param_name = error_msg.split("'")[1] if "'" in error_msg else "unknown"
+      raise Exception(f"Missing parameter: {param_name}. Use --param {param_name}=value to pass parameters") from e
+    else:
+      raise Exception(f"Missing parameter: {error_msg}. Use --param to pass parameters") from e
   finally:
     # Clean up sys.modules and sys.path
     if original_module_in_sys is None:

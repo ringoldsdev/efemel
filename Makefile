@@ -10,7 +10,7 @@ help:
 	@echo "  format               - Format code with ruff"
 	@echo "  check                - Run all checks (lint + format check + tests)"
 	@echo "  test                 - Run tests with pytest"
-	@echo "  generate-test-outputs - Generate expected test outputs from test inputs"
+	@echo "  generate-test-outputs - Generate expected test outputs from test inputs (includes params file demo)"
 	@echo "  clean                - Clean build artifacts and cache files"
 	@echo "  build                - Build the package for distribution"
 	@echo "  upload-test          - Upload package to TestPyPI"
@@ -72,6 +72,12 @@ generate-test-outputs:
 
 	@rm -rf tests/outputs/process_data_unwrap
 	@uv run efemel process "**/*.py" --cwd tests/inputs/process_data --out tests/outputs/process_data_unwrap --unwrap user_data
+
+	@rm -rf tests/outputs/with_params
+	@uv run efemel process "**/*.py" --cwd tests/inputs/with_params --out tests/outputs/with_params --param app_name=myapp --param version=2.0.0 --param debug_mode=true --param port=8080 --param 'database_config={"host":"prod-db","port":5432}' --param memory_mb=512
+
+	@rm -rf tests/outputs/with_params_file
+	@uv run efemel process "config.py" --cwd tests/inputs/with_params_file --out tests/outputs/with_params_file --params-file tests/params/params.py
 
 
 # Clean build artifacts and cache files

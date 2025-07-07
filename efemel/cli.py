@@ -62,11 +62,63 @@ def info():
   multiple=True,
   help="Extract specific values from the processed data, merging them (can be used multiple times)",
 )
-def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap):
+@click.option(
+  "--param",
+  "-P",
+  multiple=True,
+  help="Pass custom parameters to processed scripts in key=value format (can be used multiple times)",
+)
+@click.option(
+  "--params-file",
+  type=click.Path(exists=True, readable=True, resolve_path=True),
+  help="Path to a Python file that will be processed to extract parameters for other files",
+)
+def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap, param, params_file):
   """Process Python files and extract serializable variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
   """
+
+  # Parse custom parameters
+  custom_params = {}
+
+  # Process params file if provided
+  if params_file:
+    try:
+      params_file_path = Path(params_file)
+      # Process the params file to extract parameters
+      params_data = process_py_file(params_file_path, env) or {}
+      # Filter out non-serializable and private variables
+      for key, value in params_data.items():
+        if not key.startswith("_") and not callable(value):
+          try:
+            import json
+
+            # Test if value is JSON serializable
+            json.dumps(value)
+            custom_params[key] = value
+          except (TypeError, ValueError):
+            # Skip non-serializable values
+            pass
+      click.echo(f"Loaded {len(custom_params)} parameters from {params_file}")
+    except Exception as e:
+      click.echo(f"Error processing params file '{params_file}': {e}")
+      return
+
+  # Process individual param options (these can override params file values)
+  if param:
+    for param_str in param:
+      if "=" not in param_str:
+        click.echo(f"Warning: Invalid parameter format '{param_str}'. Expected key=value format.")
+        continue
+      key, value = param_str.split("=", 1)
+      # Try to parse as JSON for complex values, otherwise keep as string
+      try:
+        import json
+
+        custom_params[key] = json.loads(value)
+      except json.JSONDecodeError:
+        custom_params[key] = value
 
   hooks_manager = HooksManager()
 
@@ -112,7 +164,7 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap):
     """Process a single file and return results."""
     try:
       # Always create output file, even if no serializable data found
-      serializable_data = process_py_file(cwd / file_path, env) or {}
+      serializable_data = process_py_file(cwd / file_path, env, custom_params) or {}
 
       (processed_data,) = hooks_manager.call(
         "process_data",

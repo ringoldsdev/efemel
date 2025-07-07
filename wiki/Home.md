@@ -106,223 +106,229 @@ efemel process "**/*.py" --out output/ --workers 1
 efemel process "**/*.py" --out output/ --hooks hooks/
 ```
 
+#### Parameter Injection
+```bash
+# Pass parameters to Python scripts during processing
+efemel process "config.py" --out output/ --param app_name=myapp --param version=2.0.0 --param debug_mode=true
+
+# Use JSON for complex parameters
+efemel process "config.py" --out output/ --param 'database_config={"host":"prod-db","port":5432}'
+
+# Multiple parameters
+efemel process "**/*.py" --out output/ \
+  --param app_name=myapp \
+  --param version=2.0.0 \
+  --param debug_mode=true \
+  --param port=8080 \
+  --param environment=production
+
+# Use params file for complex configurations
+efemel process "config.py" --out output/ --params-file params.py
+
+# Combine params file with individual params (individual params override file values)
+efemel process "config.py" --out output/ --params-file params.py --param app_name=override-app
+```
+
 ### Core Patterns & Examples
 
-#### Pattern 1: Basic Data Extraction
+#### Pattern 1: Parameter Injection
+
+**Input (`config.py`):**
+```python
+# Parameters are injected as global variables
+app_name = globals().get("app_name", "default-app")
+port = globals().get("port", 3000)
+debug_mode = globals().get("debug_mode", False)
+```
+
+**Command:**
+```bash
+efemel process config.py --out output/ --param app_name=myapp --param port=8080 --param debug_mode=true
+```
+
+**Output:**
+```json
+{
+  "app_name": "myapp",
+  "port": 8080,
+  "debug_mode": true
+}
+```
+
+#### Pattern 2: Basic Data Extraction
 
 **Input (`app_config.py`):**
 ```python
-# All serializable variables are extracted
-app_config = {
-    "name": "my-app",
-    "version": "1.0.0",
-    "port": 8080
-}
-
-database = {
-    "host": "localhost",
-    "port": 5432,
-    "name": "app_db"
-}
-
-# Simple values are also extracted
-app_name = "my-application"
+app_name = "my-app"
+version = "1.0.0"
+port = 8080
 debug_mode = True
-max_connections = 100
 
 # Private variables (underscore prefix) are ignored
-_internal_config = {"secret": "hidden"}
-_debug_flag = False
-
-# Non-serializable variables are filtered out
-import os  # This won't be extracted
+_internal_secret = "hidden"
 ```
 
-**Output (`efemel process app_config.py --out configs/`):**
+**Command:**
+```bash
+efemel process app_config.py --out output/
+```
 
-*app_config.json:*
+**Output:**
 ```json
 {
-  "app_config": {
-    "name": "my-app", 
-    "version": "1.0.0",
-    "port": 8080
-  },
-  "database": {
-    "host": "localhost",
-    "port": 5432,
-    "name": "app_db"
-  },
-  "app_name": "my-application",
-  "debug_mode": true,
-  "max_connections": 100
+  "app_name": "my-app",
+  "version": "1.0.0",
+  "port": 8080,
+  "debug_mode": true
 }
 ```
 
-#### Pattern 2: Environment-Specific File Overrides
+#### Pattern 3: Environment-Specific File Overrides
 
 **Input Files:**
 
 *config.py (default):*
 ```python
-server_config = {
-    "app_name": "api-server",
-    "log_level": "INFO",
-    "workers": 2,
-    "timeout": 30
-}
+workers = 2
+timeout = 30
 ```
 
 *config.prod.py (production override):*
 ```python
-server_config = {
-    "app_name": "api-server",
-    "log_level": "INFO",
-    "workers": 8,
-    "timeout": 60,
-    "monitoring_enabled": True
-}
+workers = 8
+timeout = 60
 ```
 
 *main.py (imports the config):*
 ```python
-from config import server_config
+from config import workers, timeout
 
-application = {
-    "name": "web-api",
-    "config": server_config
+server_config = {
+    "workers": workers,
+    "timeout": timeout
 }
 ```
 
-**Default Output (`efemel process main.py --out configs/`):**
+**Default Output (`efemel process main.py --out output/`):**
 ```json
 {
-  "application": {
-    "name": "web-api",
-    "config": {
-      "app_name": "api-server",
-      "log_level": "INFO",
-      "workers": 2,
-      "timeout": 30
-    }
+  "server_config": {
+    "workers": 2,
+    "timeout": 30
   }
 }
 ```
 
-**Production Output (`efemel process main.py --out configs/ --env prod`):**
+**Production Output (`efemel process main.py --out output/ --env prod`):**
 ```json
 {
-  "application": {
-    "name": "web-api",
-    "config": {
-      "app_name": "api-server",
-      "log_level": "INFO",
-      "workers": 8,
-      "timeout": 60,
-      "monitoring_enabled": true
-    }
+  "server_config": {
+    "workers": 8,
+    "timeout": 60
   }
 }
 ```
 
-#### Pattern 3: Composable Configuration Parts
+#### Pattern 4: Composable Configuration Parts
 
 **Input (`docker_config.py`):**
 ```python
-# Base service definition
+# Base configuration
 base_service = {
     "restart": "unless-stopped",
     "networks": ["app-network"]
 }
 
-# Reusable components
-logging_config = {
-    "driver": "json-file",
-    "options": {
-        "max-size": "10m",
-        "max-file": "3"
-    }
-}
-
-health_check = {
-    "test": ["CMD", "curl", "-f", "http://localhost:8080/health"],
-    "interval": "30s",
-    "timeout": "10s",
-    "retries": 3
-}
-
-# Compose services using Python dict merging
+# Specific services using base
 web_service = {
     **base_service,
     "image": "nginx:alpine",
-    "ports": ["80:80"],
-    "logging": logging_config,
-    "healthcheck": health_check
+    "ports": ["80:80"]
 }
 
 api_service = {
     **base_service,
     "image": "python:3.12",
-    "ports": ["8080:8080"],
-    "logging": logging_config,
-    "environment": {
-        "DATABASE_URL": "postgresql://localhost/app",
-        "REDIS_URL": "redis://localhost:6379"
-    }
+    "ports": ["8080:8080"]
 }
 
-# Final docker-compose structure
-docker_compose = {
-    "version": "3.8",
-    "services": {
-        "web": web_service,
-        "api": api_service
-    },
-    "networks": {
-        "app-network": {"driver": "bridge"}
-    }
+# Final composition
+services = {
+    "web": web_service,
+    "api": api_service
 }
 ```
 
-**Output (`efemel process docker_config.py --out configs/ --unwrap docker_compose`):**
+**Command:**
+```bash
+efemel process docker_config.py --out output/ --pick services
+```
 
-*docker_config.json:*
+**Output:**
 ```json
 {
-  "version": "3.8",
   "services": {
     "web": {
       "restart": "unless-stopped",
       "networks": ["app-network"],
       "image": "nginx:alpine",
-      "ports": ["80:80"],
-      "logging": {
-        "driver": "json-file",
-        "options": {
-          "max-size": "10m", 
-          "max-file": "3"
-        }
-      },
-      "healthcheck": {
-        "test": ["CMD", "curl", "-f", "http://localhost:8080/health"],
-        "interval": "30s",
-        "timeout": "10s",
-        "retries": 3
-      }
+      "ports": ["80:80"]
     },
     "api": {
       "restart": "unless-stopped",
       "networks": ["app-network"],
       "image": "python:3.12",
-      "ports": ["8080:8080"],
-      "environment": {
-        "DATABASE_URL": "postgresql://localhost/app",
-        "REDIS_URL": "redis://localhost:6379"
-      }
+      "ports": ["8080:8080"]
     }
+  }
+}
+```
+
+#### Pattern 5: Parameter Files
+
+**Params File (`params.py`):**
+```python
+app_name = "my-app"
+version = "2.0.0"
+debug_mode = False
+port = 8080
+
+database_config = {
+    "host": "prod-db.example.com",
+    "port": 5432
+}
+```
+
+**Config File (`config.py`):**
+```python
+# Use parameters from params file
+app_config = {
+    "name": app_name,
+    "version": version,
+    "debug": debug_mode,
+    "port": port
+}
+
+db_config = database_config
+```
+
+**Command:**
+```bash
+efemel process config.py --out output/ --params-file params.py
+```
+
+**Output:**
+```json
+{
+  "app_config": {
+    "name": "my-app",
+    "version": "2.0.0",
+    "debug": false,
+    "port": 8080
   },
-  "networks": {
-    "app-network": {"driver": "bridge"}
+  "db_config": {
+    "host": "prod-db.example.com",
+    "port": 5432
   }
 }
 ```
@@ -345,6 +351,8 @@ docker_compose = {
 | `--flatten` | `-f` | `flag` | No | `False` | Flatten directory structure |
 | `--pick` | `-p` | `str` | No | `None` | Pick specific keys from the extracted data (can be used multiple times) |
 | `--unwrap` | `-u` | `str` | No | `None` | Extract specific values from the processed data, merging them (can be used multiple times) |
+| `--param` | `-P` | `str` | No | `None` | Pass custom parameters to processed scripts in key=value format (can be used multiple times) |
+| `--params-file` | - | `str` | No | `None` | Path to a Python file that will be processed to extract parameters for other files |
 
 ### Hook Configuration
 
