@@ -89,6 +89,12 @@ def get_test_scenarios():
       ],
       "assets": ["params/params.py"],
     },
+    {
+      "name": "dry run",
+      "inputs_dir": test_dir / "inputs/basic",
+      "outputs_dir": test_dir / "outputs/dry_run",
+      "process_args": ["--dry-run"],
+    },
   ]
 
 

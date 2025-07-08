@@ -1,4 +1,5 @@
 import os
+import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from efemel.process import process_py_file
 from efemel.readers.local import LocalReader
 from efemel.transformers.json import JSONTransformer
 from efemel.writers.local import LocalWriter
+from efemel.writers.sink import SinkWriter
 
 DEFAULT_WORKERS = os.cpu_count() or 1
 
@@ -73,11 +75,26 @@ def info():
   type=click.Path(exists=True, readable=True, resolve_path=True),
   help="Path to a Python file that will be processed to extract parameters for other files",
 )
-def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap, param, params_file):
+@click.option(
+  "--clean",
+  is_flag=True,
+  default=False,
+  help="Clean (delete) the output directory before processing",
+)
+@click.option(
+  "--dry-run",
+  is_flag=True,
+  default=False,
+  help="Show what would be processed without writing files",
+)
+def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap, param, params_file, clean, dry_run):
   """Process Python files and extract serializable variables to JSON.
 
   FILE_PATTERN: Glob pattern to match Python files (e.g., "**/*.py")
   """
+
+  if dry_run:
+    click.echo("Dry run mode enabled. No files will be written.")
 
   # Parse custom parameters
   custom_params = {}
@@ -124,7 +141,7 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap, 
 
   reader = LocalReader(cwd)
   transformer = JSONTransformer()
-  writer = LocalWriter(out, reader.original_cwd)
+  writer = LocalWriter(out, reader.original_cwd) if not dry_run else SinkWriter(out, reader.original_cwd)
 
   if flatten:
     # Add the flatten_output_path hook to the hooks manager
@@ -159,6 +176,17 @@ def process(file_pattern, out, flatten, cwd, env, workers, hooks, pick, unwrap, 
   if not files_to_process:
     click.echo("No files found matching the pattern.")
     return
+
+  # Clean output directory if requested
+  output_path = Path(out)
+  if clean and not dry_run:
+    if output_path.exists():
+      click.echo(f"Cleaning output directory: {output_path}")
+      shutil.rmtree(output_path)
+      click.echo("Output directory cleaned successfully.")
+
+  # Ensure the output directory exists for writing
+  output_path.mkdir(parents=True, exist_ok=True)
 
   def process_single_file(file_path: Path, cwd: Path):  # Added type hint for clarity
     """Process a single file and return results."""
