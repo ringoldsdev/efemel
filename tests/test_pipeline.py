@@ -165,10 +165,8 @@ class TestPipeline:
     pipeline = Pipeline()
 
     # Multiple map operations should work fine since no filters can fail
-    result = pipeline.multi(
-        lambda p: p.map(lambda x: x * 2).map(lambda x: x + 1)
-    ).run([1, 2, 3, 4, 5])
-    
+    result = pipeline.multi(lambda p: p.map(lambda x: x * 2).map(lambda x: x + 1)).run([1, 2, 3, 4, 5])
+
     # Each number: x * 2 + 1
     assert result == [3, 5, 7, 9, 11]
 
@@ -179,10 +177,10 @@ class TestPipeline:
     # Note: Current implementation fails if ANY item fails the filter
     # This tests the actual behavior, not necessarily the expected behavior
     result = pipeline.multi(lambda p: p.filter(lambda x: x > 0).map(lambda x: x * 2)).run([1, -2, 3, -4, 5])
-    
+
     # The operation fails because negative numbers don't pass the filter
     assert result is None
-    
+
     # Test with all positive numbers (all pass the filter)
     pipeline = Pipeline()
     result = pipeline.multi(lambda p: p.filter(lambda x: x > 0).map(lambda x: x * 2)).run([1, 2, 3, 4, 5])
@@ -201,17 +199,15 @@ class TestPipeline:
 
     # The operation fails because jane (age 17) doesn't pass the filter
     assert result is None
-    
+
     # Test with all adults
     adults_only = [{"name": "john", "age": 25}, {"name": "bob", "age": 30}]
-    
+
     pipeline = Pipeline()
     result = pipeline.multi(
-      lambda p: p.filter(lambda user: user["age"] >= 18).map(
-        lambda user: user["name"].title()
-      )
+      lambda p: p.filter(lambda user: user["age"] >= 18).map(lambda user: user["name"].title())
     ).run(adults_only)
-    
+
     assert result == ["John", "Bob"]
 
   def test_multi_failure_handling(self):
@@ -254,7 +250,7 @@ class TestPipeline:
     # "apple, banana, , cherry" -> ["apple", " banana", " ", " cherry"]
     # The multi operation fails because one item (empty string after strip) fails the filter
     assert result is None
-    
+
     # Test with no empty items
     pipeline = Pipeline()
     result = (
@@ -263,7 +259,7 @@ class TestPipeline:
       .map(lambda items: len(items))
       .run("apple, banana, cherry")
     )
-    
+
     # "apple, banana, cherry" -> ["apple", " banana", " cherry"]
     # -> ["apple", "banana", "cherry"] (strip and all pass filter)
     # -> 3 (count items)
