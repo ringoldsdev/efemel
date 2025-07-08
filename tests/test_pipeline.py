@@ -152,119 +152,6 @@ class TestPipeline:
     result = pipeline.run(SYMBOL_END)
     assert result == {"name": "John", "age": 30, "city": "NYC"}
 
-  def test_multi_basic_transformation(self):
-    """Test multi operation with basic transformations."""
-    pipeline = Pipeline()
-
-    # Transform each string to uppercase
-    result = pipeline.multi(lambda p: p.map(str.upper)).run(["hello", "world"])
-    assert result == ["HELLO", "WORLD"]
-
-  def test_multi_map_only_transformations(self):
-    """Test multi operation with only map transformations (no filters)."""
-    pipeline = Pipeline()
-
-    # Multiple map operations should work fine since no filters can fail
-    result = pipeline.multi(lambda p: p.map(lambda x: x * 2).map(lambda x: x + 1)).run([1, 2, 3, 4, 5])
-
-    # Each number: x * 2 + 1
-    assert result == [3, 5, 7, 9, 11]
-
-  def test_multi_filter_and_transform(self):
-    """Test multi operation with filtering and transformation."""
-    pipeline = Pipeline()
-
-    # Note: Current implementation fails if ANY item fails the filter
-    # This tests the actual behavior, not necessarily the expected behavior
-    result = pipeline.multi(lambda p: p.filter(lambda x: x > 0).map(lambda x: x * 2)).run([1, -2, 3, -4, 5])
-
-    # The operation fails because negative numbers don't pass the filter
-    assert result is None
-
-    # Test with all positive numbers (all pass the filter)
-    pipeline = Pipeline()
-    result = pipeline.multi(lambda p: p.filter(lambda x: x > 0).map(lambda x: x * 2)).run([1, 2, 3, 4, 5])
-    assert result == [2, 4, 6, 8, 10]
-
-  def test_multi_complex_object_transformation(self):
-    """Test multi operation with complex object transformations."""
-    users = [{"name": "john", "age": 25}, {"name": "jane", "age": 17}, {"name": "bob", "age": 30}]
-
-    pipeline = Pipeline()
-    result = pipeline.multi(
-      lambda p: p.filter(lambda user: user["age"] >= 18).map(  # Only adults
-        lambda user: user["name"].title()
-      )  # Extract and capitalize name
-    ).run(users)
-
-    # The operation fails because jane (age 17) doesn't pass the filter
-    assert result is None
-
-    # Test with all adults
-    adults_only = [{"name": "john", "age": 25}, {"name": "bob", "age": 30}]
-
-    pipeline = Pipeline()
-    result = pipeline.multi(
-      lambda p: p.filter(lambda user: user["age"] >= 18).map(lambda user: user["name"].title())
-    ).run(adults_only)
-
-    assert result == ["John", "Bob"]
-
-  def test_multi_failure_handling(self):
-    """Test that multi operation handles failures properly."""
-    pipeline = Pipeline()
-
-    # Division by zero in one item should fail entire operation
-    result = pipeline.multi(lambda p: p.map(lambda x: 1 / x)).run([1, 2, 0, 3])
-
-    assert result is None
-
-  def test_multi_with_empty_list(self):
-    """Test multi operation with empty list."""
-    pipeline = Pipeline()
-
-    result = pipeline.multi(lambda p: p.map(lambda x: x * 2)).run([])
-    assert result == []
-
-  def test_multi_chaining_with_other_operations(self):
-    """Test chaining multi with other pipeline operations."""
-    pipeline = Pipeline()
-
-    # Double each number, then sum the results
-    result = pipeline.multi(lambda p: p.map(lambda x: x * 2)).map(lambda results: sum(results)).run([1, 2, 3])
-
-    # [1, 2, 3] -> [2, 4, 6] -> 12
-    assert result == 12
-
-  def test_complex_pipeline_string_processing(self):
-    """Test a complex pipeline for string processing."""
-    pipeline = Pipeline()
-
-    result = (
-      pipeline.map(lambda x: x.split(","))
-      .multi(lambda p: p.map(str.strip).filter(lambda s: len(s) > 0))
-      .map(lambda items: len(items))
-      .run("apple, banana, , cherry")
-    )
-
-    # "apple, banana, , cherry" -> ["apple", " banana", " ", " cherry"]
-    # The multi operation fails because one item (empty string after strip) fails the filter
-    assert result is None
-
-    # Test with no empty items
-    pipeline = Pipeline()
-    result = (
-      pipeline.map(lambda x: x.split(","))
-      .multi(lambda p: p.map(str.strip).filter(lambda s: len(s) > 0))
-      .map(lambda items: len(items))
-      .run("apple, banana, cherry")
-    )
-
-    # "apple, banana, cherry" -> ["apple", " banana", " cherry"]
-    # -> ["apple", "banana", "cherry"] (strip and all pass filter)
-    # -> 3 (count items)
-    assert result == 3
-
   def test_pipeline_failure_propagation(self):
     """Test that failures propagate through the pipeline."""
     pipeline = Pipeline()
@@ -327,16 +214,6 @@ class TestPipeline:
     assert str(SYMBOL_END) == "SymbolEnd"
     assert str(SYMBOL_RESET) == "SymbolReset"
 
-  def test_nested_multi_operations(self):
-    """Test nested multi operations."""
-    # Create a list of lists
-    data = [[1, 2], [3, 4], [5, 6]]
-
-    pipeline = Pipeline()
-    result = pipeline.multi(lambda p: p.multi(lambda inner_p: inner_p.map(lambda x: x * 2))).run(data)
-
-    assert result == [[2, 4], [6, 8], [10, 12]]
-
   def test_pipeline_method_chaining_returns_self(self):
     """Test that all pipeline methods return self for chaining."""
     pipeline = Pipeline()
@@ -346,4 +223,3 @@ class TestPipeline:
     assert pipeline.map(lambda x: x) is pipeline
     assert pipeline.filter(lambda x: True) is pipeline
     assert pipeline.reduce(lambda acc, x: acc, 0) is pipeline
-    assert pipeline.multi(lambda p: p) is pipeline

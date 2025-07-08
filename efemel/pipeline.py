@@ -61,11 +61,6 @@ class Pipeline:
 
   Advanced Usage:
   ```python
-  # Working with lists
-  pipeline = Pipeline()
-  result = pipeline.multi(lambda p: p.map(lambda x: x.upper())).run(["hello", "world"])
-  # result = ["HELLO", "WORLD"]
-
   # Reduce operations
   pipeline = Pipeline()
   pipeline.reduce(lambda acc, x: acc + x, 0)
@@ -320,141 +315,33 @@ class Pipeline:
     self._transformation = new_transformation
     return self
 
-  def multi(self, create_transformation: Callable[["Pipeline"], "Pipeline"]):
-    """
-    Apply a transformation to each item in a list/array.
-    
-    This method takes a factory function that creates a transformation pipeline
-    for individual items. It then applies this transformation to each item in
-    an input list, collecting the results.
-    
-    Args:
-        create_transformation: A function that takes a Pipeline and returns a configured Pipeline
-                              for transforming individual items
-                              
-    Returns:
-        self: For method chaining
-        
-    Example - Transform each string in a list:
-    ```python
-    pipeline = Pipeline()
-    result = pipeline.multi(lambda p: p.map(str.upper)).run(["hello", "world"])
-    # result = ["HELLO", "WORLD"]
-    ```
-    
-    Example - Filter and transform:
-    ```python
-    pipeline = Pipeline()
-    result = pipeline.multi(
-        lambda p: p.filter(lambda x: x > 0).map(lambda x: x * 2)
-    ).run([1, -2, 3, -4, 5])
-    # result = [2, 6, 10] (negative numbers filtered out, positive ones doubled)
-    ```
-    
-    Example - Complex object transformation:
-    ```python
-    users = [
-        {"name": "john", "age": 25},
-        {"name": "jane", "age": 17},
-        {"name": "bob", "age": 30}
-    ]
-    
-    pipeline = Pipeline()
-    result = pipeline.multi(
-        lambda p: p
-            .filter(lambda user: user["age"] >= 18)  # Only adults
-            .map(lambda user: user["name"].title())   # Extract and capitalize name
-    ).run(users)
-    # result = ["John", "Bob"]
-    ```
-    
-    Failure handling:
-    ```python
-    # If any item transformation fails, the entire multi operation fails
-    pipeline = Pipeline()
-    result = pipeline.multi(
-        lambda p: p.map(lambda x: 1 / x)  # Division by zero will fail
-    ).run([1, 2, 0, 3])
-    # result = None (pipeline fails when processing 0)
-    ```
-    
-    Chaining with other operations:
-    ```python
-    pipeline = Pipeline()
-    result = pipeline\
-        .multi(lambda p: p.map(lambda x: x * 2))\
-        .map(lambda results: sum(results))\
-        .run([1, 2, 3])
-    # Step 1: [1, 2, 3] -> [2, 4, 6] (multi doubles each)
-    # Step 2: [2, 4, 6] -> 12 (map sums the results)
-    # result = 12
-    ```
-    """
-    current_transformation = self._transformation
-
-    # Create the item transformer by calling the factory function with a new identity pipeline
-    item_pipeline = Pipeline().identity()
-    item_transformer = create_transformation(item_pipeline)._transformation
-
-    def new_transformation(input_value, success_callback, failure_callback):
-      def on_success(transformed_values: list[Any]):
-        try:
-          results = []
-          for value in transformed_values:
-            result = None
-
-            def item_success(data):
-              nonlocal result
-              result = data
-
-            def item_failure():
-              nonlocal result
-              result = None
-
-            item_transformer(value, item_success, item_failure)
-
-            if result is not None:
-              results.append(result)
-            else:
-              failure_callback()
-              return
-
-          success_callback(results)
-        except Exception:
-          failure_callback()
-
-      current_transformation(input_value, on_success, failure_callback)
-
-    self._transformation = new_transformation
-    return self
-
   def run(self, input_value: Any) -> Any | None:
     """
     Execute the pipeline with the given input value.
-    
+
     This method runs the entire transformation pipeline synchronously and returns
     the final result. If any step in the pipeline fails, it returns None.
-    
+
     Args:
         input_value: The value to process through the pipeline
-        
+
     Returns:
         The final transformed value, or None if the pipeline failed
-        
+
     Example - Basic usage:
     ```python
     pipeline = Pipeline()
     result = pipeline.map(lambda x: x * 2).run(5)
     # result = 10
     ```
-    
+
     Example - Pipeline failure:
     ```python
     pipeline = Pipeline()
     result = pipeline.filter(lambda x: x > 10).run(5)
     # result = None (5 is not > 10, so filter fails)
     ```
-    
+
     Example - Complex pipeline:
     ```python
     pipeline = Pipeline()
@@ -468,7 +355,7 @@ class Pipeline:
     # Step 3: ["apple", "banana", "cherry"] -> 3
     # result = 3
     ```
-    
+
     Thread safety:
     This method is NOT thread-safe. Each Pipeline instance should be used by only
     one thread at a time, or proper synchronization should be implemented.
