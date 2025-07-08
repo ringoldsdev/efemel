@@ -52,6 +52,8 @@ test:
 
 # Generate expected test outputs from test inputs
 generate-test-outputs:
+	mkdir -p tests/outputs/dry_run
+	touch tests/outputs/dry_run/.gitkeep
 	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/basic --clean
 	@uv run efemel process "*.py" --cwd tests/inputs/with_imports --out tests/outputs/with_imports --env prod --clean
 	@uv run efemel process "**/*.py" --cwd tests/inputs/basic --out tests/outputs/flattened --flatten --clean
