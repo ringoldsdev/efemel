@@ -350,6 +350,7 @@ efemel process config.py --out output/ --params-file params.py
 | `--hooks` | `-h` | `str` | No | `None` | Path to hooks file or directory |
 | `--flatten` | `-f` | `flag` | No | `False` | Flatten directory structure |
 | `--clean` | - | `flag` | No | `False` | Clean (delete) the output directory before processing |
+| `--dry-run` | - | `flag` | No | `False` | Show what would be processed without writing files |
 | `--pick` | `-p` | `str` | No | `None` | Pick specific keys from the extracted data (can be used multiple times) |
 | `--unwrap` | `-u` | `str` | No | `None` | Extract specific values from the processed data, merging them (can be used multiple times) |
 | `--param` | `-P` | `str` | No | `None` | Pass custom parameters to processed scripts in key=value format (can be used multiple times) |
