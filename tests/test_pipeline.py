@@ -654,3 +654,31 @@ class TestPipelineComposition:
 
     # Expected: [4, 6, 8, 5, 7] -> [16, 36, 64, 25, 49] -> 190
     assert result.first() == 190
+
+
+class TestPipelineConcurrency:
+  """Test Pipeline concurrency functionality."""
+
+  def test_concurrent(self):
+    # Create a simple pipeline
+
+    def _double_pipeline(p: Pipeline[int]):
+      return p.map(lambda x: x * 2)
+
+    result = Pipeline(range(0, 5), 1).concurrent(_double_pipeline, 5).to_list()
+
+    # Check if all numbers are doubled
+    assert result == [0, 2, 4, 6, 8]
+
+  def test_concurrent_consumer(self):
+    # Create a simple pipeline
+
+    items = []
+
+    def dummy_consumer(p: Pipeline[int]):
+      return p.tap(lambda x: items.append(x))
+
+    Pipeline(range(0, 5), 1).concurrent(dummy_consumer, 5).noop()
+
+    # Check if all numbers are consumed
+    assert items == [0, 1, 2, 3, 4]
