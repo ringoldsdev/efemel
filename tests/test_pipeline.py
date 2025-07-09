@@ -18,7 +18,10 @@ class TestPipelineBasics:
     # Test with list
     pipeline = Pipeline([1, 2, 3, 4, 5])
     assert isinstance(pipeline, Pipeline)
-    assert pipeline.generator == [1, 2, 3, 4, 5]
+    # Generator should be a generator object, not the original list
+    from types import GeneratorType
+
+    assert isinstance(pipeline.generator, GeneratorType)
 
     # Test with tuple
     pipeline = Pipeline((1, 2, 3))
@@ -79,26 +82,26 @@ class TestPipelineFiltering:
 
   def test_filter_basic(self):
     """Test basic filtering operations."""
-    pipeline = Pipeline([1, 2, 3, 4, 5])
-
     # Filter even numbers
-    even_pipeline = pipeline.filter(lambda x: x % 2 == 0)
+    pipeline1 = Pipeline([1, 2, 3, 4, 5])
+    even_pipeline = pipeline1.filter(lambda x: x % 2 == 0)
     assert even_pipeline.to_list() == [2, 4]
 
-    # Filter numbers greater than 3
-    gt3_pipeline = pipeline.filter(lambda x: x > 3)
+    # Filter numbers greater than 3 - use fresh pipeline
+    pipeline2 = Pipeline([1, 2, 3, 4, 5])
+    gt3_pipeline = pipeline2.filter(lambda x: x > 3)
     assert gt3_pipeline.to_list() == [4, 5]
 
   def test_filter_with_strings(self):
     """Test filtering with string data."""
-    pipeline = Pipeline(["hello", "world", "python", "test"])
-
     # Filter strings longer than 4 characters
-    long_strings = pipeline.filter(lambda s: len(s) > 4)
+    pipeline1 = Pipeline(["hello", "world", "python", "test"])
+    long_strings = pipeline1.filter(lambda s: len(s) > 4)
     assert long_strings.to_list() == ["hello", "world", "python"]
 
-    # Filter strings starting with 'p'
-    p_strings = pipeline.filter(lambda s: s.startswith("p"))
+    # Filter strings starting with 'p' - use fresh pipeline
+    pipeline2 = Pipeline(["hello", "world", "python", "test"])
+    p_strings = pipeline2.filter(lambda s: s.startswith("p"))
     assert p_strings.to_list() == ["python"]
 
   def test_filter_empty_result(self):
@@ -131,38 +134,38 @@ class TestPipelineMapping:
 
   def test_map_basic(self):
     """Test basic mapping operations."""
-    pipeline = Pipeline([1, 2, 3, 4, 5])
-
     # Double each number
-    doubled = pipeline.map(lambda x: x * 2)
+    pipeline1 = Pipeline([1, 2, 3, 4, 5])
+    doubled = pipeline1.map(lambda x: x * 2)
     assert doubled.to_list() == [2, 4, 6, 8, 10]
 
-    # Square each number
-    squared = pipeline.map(lambda x: x**2)
+    # Square each number - use fresh pipeline
+    pipeline2 = Pipeline([1, 2, 3, 4, 5])
+    squared = pipeline2.map(lambda x: x**2)
     assert squared.to_list() == [1, 4, 9, 16, 25]
 
   def test_map_type_transformation(self):
     """Test mapping with type transformation."""
-    pipeline = Pipeline([1, 2, 3, 4, 5])
-
     # Convert numbers to strings
-    str_pipeline = pipeline.map(str)
+    pipeline1 = Pipeline([1, 2, 3, 4, 5])
+    str_pipeline = pipeline1.map(str)
     assert str_pipeline.to_list() == ["1", "2", "3", "4", "5"]
 
-    # Convert to boolean (non-zero is True)
-    bool_pipeline = pipeline.map(bool)
+    # Convert to boolean (non-zero is True) - use fresh pipeline
+    pipeline2 = Pipeline([1, 2, 3, 4, 5])
+    bool_pipeline = pipeline2.map(bool)
     assert bool_pipeline.to_list() == [True, True, True, True, True]
 
   def test_map_with_strings(self):
     """Test mapping with string data."""
-    pipeline = Pipeline(["hello", "world", "python"])
-
     # Convert to uppercase
-    upper_pipeline = pipeline.map(str.upper)
+    pipeline1 = Pipeline(["hello", "world", "python"])
+    upper_pipeline = pipeline1.map(str.upper)
     assert upper_pipeline.to_list() == ["HELLO", "WORLD", "PYTHON"]
 
-    # Get string lengths
-    len_pipeline = pipeline.map(len)
+    # Get string lengths - use fresh pipeline
+    pipeline2 = Pipeline(["hello", "world", "python"])
+    len_pipeline = pipeline2.map(len)
     assert len_pipeline.to_list() == [5, 5, 6]
 
   def test_map_chaining(self):
@@ -220,26 +223,26 @@ class TestPipelineReduce:
 
   def test_reduce_basic(self):
     """Test basic reduce operations."""
-    pipeline = Pipeline([1, 2, 3, 4, 5])
-
     # Sum all numbers
-    sum_result = pipeline.reduce(lambda acc, x: acc + x, 0)
+    pipeline1 = Pipeline([1, 2, 3, 4, 5])
+    sum_result = pipeline1.reduce(lambda acc, x: acc + x, 0)
     assert sum_result.first() == 15
 
-    # Multiply all numbers
-    product_result = pipeline.reduce(lambda acc, x: acc * x, 1)
+    # Multiply all numbers - use fresh pipeline
+    pipeline2 = Pipeline([1, 2, 3, 4, 5])
+    product_result = pipeline2.reduce(lambda acc, x: acc * x, 1)
     assert product_result.first() == 120
 
   def test_reduce_with_strings(self):
     """Test reduce with string data."""
-    pipeline = Pipeline(["hello", "world", "python"])
-
     # Concatenate strings
-    concat_result = pipeline.reduce(lambda acc, x: acc + " " + x, "")
+    pipeline1 = Pipeline(["hello", "world", "python"])
+    concat_result = pipeline1.reduce(lambda acc, x: acc + " " + x, "")
     assert concat_result.first() == " hello world python"
 
-    # Join with commas
-    join_result = pipeline.reduce(lambda acc, x: acc + "," + x if acc else x, "")
+    # Join with commas - use fresh pipeline
+    pipeline2 = Pipeline(["hello", "world", "python"])
+    join_result = pipeline2.reduce(lambda acc, x: acc + "," + x if acc else x, "")
     assert join_result.first() == "hello,world,python"
 
   def test_reduce_empty_pipeline(self):
@@ -426,26 +429,26 @@ class TestPipelineEdgeCases:
 
   def test_pipeline_with_none_values(self):
     """Test pipeline with None values."""
-    pipeline = Pipeline([1, None, 3, None, 5])
-
     # Should handle None values properly
-    result = pipeline.to_list()
+    pipeline1 = Pipeline([1, None, 3, None, 5])
+    result = pipeline1.to_list()
     assert result == [1, None, 3, None, 5]
 
-    # Filter out None values
-    no_none = pipeline.filter(lambda x: x is not None)
+    # Filter out None values - use fresh pipeline
+    pipeline2 = Pipeline([1, None, 3, None, 5])
+    no_none = pipeline2.filter(lambda x: x is not None)
     assert no_none.to_list() == [1, 3, 5]
 
   def test_pipeline_with_mixed_types(self):
     """Test pipeline with mixed data types."""
-    pipeline = Pipeline([1, "hello", 3.14, True, None])
-
     # Should handle mixed types
-    result = pipeline.to_list()
+    pipeline1 = Pipeline([1, "hello", 3.14, True, None])
+    result = pipeline1.to_list()
     assert result == [1, "hello", 3.14, True, None]
 
-    # Filter by type (excluding boolean which is a subclass of int)
-    numbers = pipeline.filter(lambda x: isinstance(x, int | float) and not isinstance(x, bool) and x is not None)
+    # Filter by type (excluding boolean which is a subclass of int) - use fresh pipeline
+    pipeline2 = Pipeline([1, "hello", 3.14, True, None])
+    numbers = pipeline2.filter(lambda x: isinstance(x, int | float) and not isinstance(x, bool) and x is not None)
     assert numbers.to_list() == [1, 3.14]
 
   def test_pipeline_reuse(self):
