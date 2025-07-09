@@ -1,374 +1,256 @@
-from collections.abc import Callable
-from typing import Any, TypeVar
+"""
+Pipeline module for functional data processing.
 
-T = TypeVar("T")
-U = TypeVar("U")
-V = TypeVar("V")
+This module provides a Pipeline class that enables functional programming patterns
+for data transformation and processing. It allows chaining operations like map, filter,
+reduce, and more in a fluent interface style.
+
+Example:
+    >>> pipeline = Pipeline([1, 2, 3, 4, 5])
+    >>> result = pipeline.filter(lambda x: x % 2 == 0).map(lambda x: x * 2).to_list()
+    >>> print(result)  # [4, 8]
+"""
+
+import functools
+from collections.abc import Callable, Generator, Iterable
+from typing import Any, Self, TypeVar, cast
+
+T = TypeVar("T")  # Type variable for the elements in the pipeline
+U = TypeVar("U")  # Type variable for transformed elements
+V = TypeVar("V")  # Type variable for additional transformations
 
 
-# Special symbols for reduce operations
-class SymbolEnd:
+class Pipeline[T]:
   """
-  Special symbol used to signal the end of a stream in reduce operations.
-  When this symbol is passed to a reduce transformation, it triggers the
-  final result to be emitted.
-  """
+  A functional pipeline for data processing with method chaining.
 
-  def __repr__(self):
-    return "SymbolEnd"
+  The Pipeline class wraps an iterable and provides a fluent interface for
+  applying transformations, filters, and reductions in a functional programming style.
 
+  Type Parameters:
+      T: The type of elements in the pipeline
 
-class SymbolReset:
-  """
-  Special symbol used to reset the accumulator in reduce operations.
-  When this symbol is passed to a reduce transformation, it resets the
-  accumulator back to its initial value.
-  """
+  Attributes:
+      generator: The underlying iterable that provides the data source
 
-  def __repr__(self):
-    return "SymbolReset"
-
-
-SYMBOL_END = SymbolEnd()
-SYMBOL_RESET = SymbolReset()
-
-
-class Pipeline:
-  """
-  A functional pipeline that chains transformations together in a composable way.
-
-  This class implements a callback-based transformation pipeline similar to TypeScript's
-  transformers.ts. Each transformation is built up through method chaining, creating
-  a single composed transformation function that can be executed with `.run()`.
-
-  Key Concepts:
-  - **Chaining**: Methods return self, allowing for fluent API usage
-  - **Callback-based**: Each transformation uses success/failure callbacks
-  - **Composable**: Transformations are built up by wrapping previous transformations
-  - **Failure handling**: Any step can fail, causing the entire pipeline to fail
-
-  Basic Usage:
-  ```python
-  # Simple transformation pipeline
-  pipeline = Pipeline()
-  result = pipeline.map(lambda x: x * 2).filter(lambda x: x > 10).run(6)
-  # result = 12 (6 * 2 = 12, 12 > 10 is True)
-
-  # Pipeline that fails
-  result = pipeline.map(lambda x: x * 2).filter(lambda x: x > 20).run(6)
-  # result = None (6 * 2 = 12, 12 > 20 is False, so filter fails)
-  ```
-
-  Advanced Usage:
-  ```python
-  # Reduce operations
-  pipeline = Pipeline()
-  pipeline.reduce(lambda acc, x: acc + x, 0)
-  pipeline.run(5)  # Accumulates: 0 + 5 = 5
-  pipeline.run(3)  # Accumulates: 5 + 3 = 8
-  result = pipeline.run(SYMBOL_END)  # result = 8
-  ```
+  Example:
+      >>> data = [1, 2, 3, 4, 5]
+      >>> pipeline = Pipeline(data)
+      >>> result = (pipeline
+      ...     .filter(lambda x: x > 2)
+      ...     .map(lambda x: x ** 2)
+      ...     .to_list())
+      >>> print(result)  # [9, 16, 25]
   """
 
-  def __init__(self):
-    # Internal transformation function that gets built up through chaining
-    self._transformation = self._create_identity_transformation()
+  generator: Iterable[T]
 
-  def _create_identity_transformation(self):
+  def __init__(self, source: Iterable[T]):
     """
-    Create the base identity transformation that simply passes input to output.
+    Initialize a new Pipeline with the given data source.
 
-    This is the foundation that all other transformations build upon.
-    It takes an input value and immediately calls the success callback with it.
+    Args:
+        source: An iterable that provides the data for the pipeline
+    """
+    self.generator = source
+
+  def __next__(self) -> T:
+    """
+    Get the next item from the pipeline.
 
     Returns:
-        A transformation function that accepts (input_value, success_callback, failure_callback)
+        The next item in the pipeline
+
+    Raises:
+        StopIteration: When there are no more items
     """
+    return next(iter(self.generator))
 
-    def transform(input_value, success_callback, failure_callback):
-      try:
-        success_callback(input_value)
-      except Exception:
-        failure_callback()
-
-    return transform
-
-  def identity(self):
+  def __iter__(self) -> Generator[T, None, None]:
     """
-    Reset the pipeline to identity transformation.
-
-    This method resets the pipeline back to its initial state, effectively
-    clearing all previously chained transformations.
+    Return an iterator over the pipeline elements.
 
     Returns:
-        self: For method chaining
+        A generator that yields the pipeline elements
+    """
+    yield from self.generator
+
+  def to_list(self) -> list[T]:
+    """
+    Convert the pipeline to a list.
+
+    Returns:
+        A list containing all elements from the pipeline
 
     Example:
-    ```python
-    pipeline = Pipeline()
-    pipeline.map(lambda x: x * 2).filter(lambda x: x > 10)
-
-    # Reset the pipeline
-    pipeline.identity()
-
-    # Now the pipeline just passes values through unchanged
-    result = pipeline.run(5)  # result = 5
-    ```
+        >>> Pipeline([1, 2, 3]).to_list()
+        [1, 2, 3]
     """
-    self._transformation = self._create_identity_transformation()
-    return self
+    return list(self)
 
-  def map(self, modifier: Callable[[Any], Any]):
+  def first(self) -> T:
     """
-    Apply a transformation function to the input value.
-
-    This is equivalent to the functional programming `map` operation.
-    It takes the current value in the pipeline and transforms it using
-    the provided modifier function.
-
-    Args:
-        modifier: A function that takes one argument and returns a transformed value
+    Get the first element from the pipeline.
 
     Returns:
-        self: For method chaining
+        The first element in the pipeline
+
+    Raises:
+        StopIteration: If the pipeline is empty
 
     Example:
-    ```python
-    # Double all numbers
-    pipeline = Pipeline()
-    result = pipeline.map(lambda x: x * 2).run(5)
-    # result = 10
-
-    # Chain multiple maps
-    result = pipeline.map(lambda x: x * 2).map(lambda x: x + 1).run(5)
-    # result = 11 (5 * 2 = 10, 10 + 1 = 11)
-
-    # Transform strings
-    result = pipeline.map(str.upper).run("hello")
-    # result = "HELLO"
-    ```
-
-    Failure handling:
-    ```python
-    # If the modifier function raises an exception, the pipeline fails
-    pipeline = Pipeline()
-    result = pipeline.map(lambda x: x / 0).run(5)  # Division by zero
-    # result = None (pipeline failed)
-    ```
+        >>> Pipeline([1, 2, 3]).first()
+        1
     """
-    current_transformation = self._transformation
+    return next(iter(self.generator))
 
-    def new_transformation(input_value, success_callback, failure_callback):
-      def on_success(transformed_value):
-        try:
-          result = modifier(transformed_value)
-          success_callback(result)
-        except Exception:
-          failure_callback()
-
-      current_transformation(input_value, on_success, failure_callback)
-
-    self._transformation = new_transformation
-    return self
-
-  def filter(self, predicate: Callable[[Any], bool]):
+  def filter(
+    self,
+    predicate: Callable[[T], bool],
+  ) -> "Pipeline[T]":
     """
-    Filter values based on a predicate function.
-
-    This is equivalent to the functional programming `filter` operation.
-    If the predicate returns True, the value passes through. If it returns
-    False, the pipeline fails (calls failure_callback).
+    Filter pipeline elements based on a predicate function.
 
     Args:
-        predicate: A function that takes one argument and returns True/False
+        predicate: A function that takes an element and returns True to keep it
 
     Returns:
-        self: For method chaining
+        A new pipeline containing only elements that satisfy the predicate
 
     Example:
-    ```python
-    # Only allow even numbers
-    pipeline = Pipeline()
-    result = pipeline.filter(lambda x: x % 2 == 0).run(4)
-    # result = 4 (4 is even, so it passes)
-
-    result = pipeline.filter(lambda x: x % 2 == 0).run(5)
-    # result = None (5 is odd, so filter fails)
-
-    # Chain with map
-    result = pipeline.map(lambda x: x * 2).filter(lambda x: x > 10).run(6)
-    # result = 12 (6 * 2 = 12, 12 > 10 is True)
-
-    result = pipeline.map(lambda x: x * 2).filter(lambda x: x > 20).run(6)
-    # result = None (6 * 2 = 12, 12 > 20 is False)
-    ```
-
-    String filtering:
-    ```python
-    # Only allow non-empty strings
-    pipeline = Pipeline()
-    result = pipeline.filter(lambda s: len(s) > 0).run("hello")
-    # result = "hello"
-
-    result = pipeline.filter(lambda s: len(s) > 0).run("")
-    # result = None (empty string fails the filter)
-    ```
+        >>> Pipeline([1, 2, 3, 4]).filter(lambda x: x % 2 == 0).to_list()
+        [2, 4]
     """
-    current_transformation = self._transformation
+    return Pipeline(item for item in self if predicate(item))
 
-    def new_transformation(input_value, success_callback, failure_callback):
-      def on_success(transformed_value):
-        try:
-          if predicate(transformed_value):
-            success_callback(transformed_value)
-          else:
-            failure_callback()
-        except Exception:
-          failure_callback()
-
-      current_transformation(input_value, on_success, failure_callback)
-
-    self._transformation = new_transformation
-    return self
-
-  def reduce(self, accumulator: Callable[[Any, Any], Any], initial_value: Any):
+  def map(
+    self,
+    function: Callable[[T], U],
+  ) -> "Pipeline[U]":
     """
-    Apply a reduce operation with stateful accumulation.
-
-    This is equivalent to the functional programming `reduce` operation, but implemented
-    in a stateful way. The accumulator maintains state between calls, and special
-    symbols (SYMBOL_END, SYMBOL_RESET) control the reduction process.
+    Transform each element in the pipeline using the given function.
 
     Args:
-        accumulator: A function that takes (accumulated_value, current_value) and returns new accumulated value
-        initial_value: The starting value for the accumulation
+        function: A function that transforms each element
 
     Returns:
-        self: For method chaining
+        A new pipeline with transformed elements
 
-    Special Symbols:
-        - SYMBOL_END: Triggers the final result to be emitted
-        - SYMBOL_RESET: Resets the accumulator back to initial_value
-
-    Example - Sum accumulation:
-    ```python
-    pipeline = Pipeline()
-    pipeline.reduce(lambda acc, x: acc + x, 0)
-
-    # Add numbers to the accumulator
-    pipeline.run(5)   # Internal state: 0 + 5 = 5
-    pipeline.run(3)   # Internal state: 5 + 3 = 8
-    pipeline.run(2)   # Internal state: 8 + 2 = 10
-
-    # Get the final result
-    result = pipeline.run(SYMBOL_END)  # result = 10
-
-    # Reset and start over
-    pipeline.run(SYMBOL_RESET)  # Internal state reset to 0
-    pipeline.run(7)   # Internal state: 0 + 7 = 7
-    result = pipeline.run(SYMBOL_END)  # result = 7
-    ```
-
-    Example - List accumulation:
-    ```python
-    pipeline = Pipeline()
-    pipeline.reduce(lambda acc, x: acc + [x], [])
-
-    pipeline.run("a")  # Internal state: [] + ["a"] = ["a"]
-    pipeline.run("b")  # Internal state: ["a"] + ["b"] = ["a", "b"]
-    result = pipeline.run(SYMBOL_END)  # result = ["a", "b"]
-    ```
-
-    Example - Object accumulation:
-    ```python
-    pipeline = Pipeline()
-    pipeline.reduce(lambda acc, item: {**acc, **item}, {})
-
-    pipeline.run({"name": "John"})    # Internal state: {"name": "John"}
-    pipeline.run({"age": 30})         # Internal state: {"name": "John", "age": 30}
-    result = pipeline.run(SYMBOL_END) # result = {"name": "John", "age": 30}
-    ```
+    Example:
+        >>> Pipeline([1, 2, 3]).map(lambda x: x * 2).to_list()
+        [2, 4, 6]
     """
-    current_transformation = self._transformation
-    acc = initial_value
+    return Pipeline(
+      map(
+        function,
+        self.generator,
+      )
+    )
 
-    def new_transformation(input_value, success_callback, failure_callback):
-      nonlocal acc
-
-      if input_value is SYMBOL_END:
-        success_callback(acc)
-        return
-
-      if input_value is SYMBOL_RESET:
-        acc = initial_value
-        return
-
-      def on_success(transformed_value):
-        nonlocal acc
-        try:
-          acc = accumulator(acc, transformed_value)
-        except Exception:
-          failure_callback()
-
-      current_transformation(input_value, on_success, failure_callback)
-
-    self._transformation = new_transformation
-    return self
-
-  def run(self, input_value: Any) -> Any | None:
+  def reduce(self, function: Callable[[U, T], U], initial: U) -> "Pipeline[U]":
     """
-    Execute the pipeline with the given input value.
-
-    This method runs the entire transformation pipeline synchronously and returns
-    the final result. If any step in the pipeline fails, it returns None.
+    Reduce the pipeline to a single value using the given function.
 
     Args:
-        input_value: The value to process through the pipeline
+        function: A function that takes an accumulator and current element
+        initial: The initial value for the accumulator
 
     Returns:
-        The final transformed value, or None if the pipeline failed
+        A new pipeline containing the single reduced value
 
-    Example - Basic usage:
-    ```python
-    pipeline = Pipeline()
-    result = pipeline.map(lambda x: x * 2).run(5)
-    # result = 10
-    ```
-
-    Example - Pipeline failure:
-    ```python
-    pipeline = Pipeline()
-    result = pipeline.filter(lambda x: x > 10).run(5)
-    # result = None (5 is not > 10, so filter fails)
-    ```
-
-    Example - Complex pipeline:
-    ```python
-    pipeline = Pipeline()
-    result = pipeline\
-        .map(lambda x: x.split(','))\
-        .multi(lambda p: p.map(str.strip).filter(lambda s: len(s) > 0))\
-        .map(lambda items: len(items))\
-        .run("apple, banana, , cherry")
-    # Step 1: "apple, banana, , cherry" -> ["apple", " banana", " ", " cherry"]
-    # Step 2: ["apple", " banana", " ", " cherry"] -> ["apple", "banana", "cherry"] (multi strips and filters)
-    # Step 3: ["apple", "banana", "cherry"] -> 3
-    # result = 3
-    ```
-
-    Thread safety:
-    This method is NOT thread-safe. Each Pipeline instance should be used by only
-    one thread at a time, or proper synchronization should be implemented.
+    Example:
+        >>> Pipeline([1, 2, 3, 4]).reduce(lambda acc, x: acc + x, 0).first()
+        10
     """
-    result = None
+    return Pipeline([functools.reduce(cast(Callable[[T, U], U], function), self, initial)])
 
-    def success(data):
-      nonlocal result
-      result = data
+  def tap(self, function: Callable[[T], Any]) -> Self:
+    """
+    Execute a side effect for each element without modifying the pipeline.
 
-    def failure():
-      nonlocal result
-      result = None
+    Args:
+        function: A function to execute for each element (side effect)
 
-    self._transformation(input_value, success, failure)
+    Returns:
+        The same pipeline (for method chaining)
+
+    Example:
+        >>> Pipeline([1, 2, 3]).tap(print).map(lambda x: x * 2).to_list()
+        1
+        2
+        3
+        [2, 4, 6]
+    """
+
+    def f(x: T) -> T:
+      function(x)
+      return x
+
+    return type(self)(self.map(f))
+
+  def each(self, function: Callable[[T], Any]) -> None:
+    """
+    Execute a function for each element in the pipeline (terminal operation).
+
+    Args:
+        function: A function to execute for each element
+
+    Example:
+        >>> Pipeline([1, 2, 3]).each(print)
+        1
+        2
+        3
+    """
+    for item in self.generator:
+      function(item)
+
+  def passthrough(self) -> Self:
+    """
+    Return the pipeline unchanged (identity operation).
+
+    Returns:
+        The same pipeline instance
+
+    Example:
+        >>> pipeline = Pipeline([1, 2, 3])
+        >>> same = pipeline.passthrough()
+        >>> pipeline is same
+        True
+    """
+    return self
+
+  def apply(self, *functions: Callable[[Self], "Pipeline[U]"]) -> "Pipeline[U]":
+    """
+    Apply a sequence of functions to the pipeline.
+
+    Args:
+        *functions: Functions that transform the pipeline
+
+    Returns:
+        The pipeline after applying all functions
+
+    Example:
+        >>> def double(p): return p.map(lambda x: x * 2)
+        >>> def filter_even(p): return p.filter(lambda x: x % 2 == 0)
+        >>> Pipeline([1, 2, 3]).apply(double, filter_even).to_list()
+        [2, 4, 6]
+    """
+    result: Pipeline[T] = self
+
+    for function in functions:
+      result = function(result)
+
     return result
+
+  def flatten(self: "Pipeline[Iterable[U]]") -> "Pipeline[U]":
+    """
+    Flatten a pipeline of iterables into a single pipeline.
+
+    Returns:
+        A new pipeline with all nested elements flattened
+
+    Example:
+        >>> Pipeline([[1, 2], [3, 4], [5]]).flatten().to_list()
+        [1, 2, 3, 4, 5]
+    """
+    return Pipeline(x_i for x in self for x_i in x)

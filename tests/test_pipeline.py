@@ -1,225 +1,561 @@
-from efemel.pipeline import SYMBOL_END, SYMBOL_RESET, Pipeline
+"""
+Test suite for the Pipeline class.
+
+This module contains comprehensive tests for the Pipeline class functionality
+including all methods, edge cases, and error conditions.
+"""
+
+import pytest
+
+from efemel.pipeline import Pipeline
 
 
-class TestPipeline:
-  """Test suite for the Pipeline class."""
+class TestPipelineBasics:
+  """Test basic Pipeline functionality."""
 
-  def test_identity_transformation(self):
-    """Test that identity transformation passes values through unchanged."""
-    pipeline = Pipeline()
+  def test_pipeline_initialization(self):
+    """Test Pipeline initialization with various iterables."""
+    # Test with list
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+    assert isinstance(pipeline, Pipeline)
+    assert pipeline.generator == [1, 2, 3, 4, 5]
 
-    # Test with different data types
-    assert pipeline.run(5) == 5
-    assert pipeline.run("hello") == "hello"
-    assert pipeline.run([1, 2, 3]) == [1, 2, 3]
-    assert pipeline.run({"key": "value"}) == {"key": "value"}
-    assert pipeline.run(None) is None
+    # Test with tuple
+    pipeline = Pipeline((1, 2, 3))
+    assert list(pipeline) == [1, 2, 3]
 
-  def test_identity_reset(self):
-    """Test that identity() resets the pipeline to initial state."""
-    pipeline = Pipeline()
+    # Test with generator
+    def gen():
+      yield from range(1, 4)
 
-    # Add some transformations
-    pipeline.map(lambda x: x * 2).filter(lambda x: x > 10)
+    pipeline = Pipeline(gen())
+    assert list(pipeline) == [1, 2, 3]
 
-    # Reset to identity
-    pipeline.identity()
+    # Test with empty list
+    pipeline = Pipeline([])
+    assert list(pipeline) == []
 
-    # Should now pass values through unchanged
-    assert pipeline.run(5) == 5
+  def test_pipeline_iteration(self):
+    """Test Pipeline iteration behavior."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
 
-  def test_map_basic_transformation(self):
-    """Test basic map transformations."""
-    pipeline = Pipeline()
+    # Test iteration
+    result = []
+    for item in pipeline:
+      result.append(item)
 
-    # Double numbers
-    result = pipeline.map(lambda x: x * 2).run(5)
-    assert result == 10
+    assert result == [1, 2, 3, 4, 5]
 
-    # Transform strings
-    pipeline = Pipeline()
-    result = pipeline.map(str.upper).run("hello")
-    assert result == "HELLO"
+  def test_to_list(self):
+    """Test Pipeline.to_list() method."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+    result = pipeline.to_list()
+
+    assert result == [1, 2, 3, 4, 5]
+    assert isinstance(result, list)
+
+    # Test with empty pipeline
+    empty_pipeline = Pipeline([])
+    assert empty_pipeline.to_list() == []
+
+  def test_first(self):
+    """Test Pipeline.first() method."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+    assert pipeline.first() == 1
+
+    # Test with string
+    str_pipeline = Pipeline(["hello", "world"])
+    assert str_pipeline.first() == "hello"
+
+  def test_first_empty_pipeline(self):
+    """Test Pipeline.first() with empty pipeline."""
+    empty_pipeline = Pipeline([])
+    with pytest.raises(StopIteration):
+      empty_pipeline.first()
+
+
+class TestPipelineFiltering:
+  """Test Pipeline filtering functionality."""
+
+  def test_filter_basic(self):
+    """Test basic filtering operations."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+
+    # Filter even numbers
+    even_pipeline = pipeline.filter(lambda x: x % 2 == 0)
+    assert even_pipeline.to_list() == [2, 4]
+
+    # Filter numbers greater than 3
+    gt3_pipeline = pipeline.filter(lambda x: x > 3)
+    assert gt3_pipeline.to_list() == [4, 5]
+
+  def test_filter_with_strings(self):
+    """Test filtering with string data."""
+    pipeline = Pipeline(["hello", "world", "python", "test"])
+
+    # Filter strings longer than 4 characters
+    long_strings = pipeline.filter(lambda s: len(s) > 4)
+    assert long_strings.to_list() == ["hello", "world", "python"]
+
+    # Filter strings starting with 'p'
+    p_strings = pipeline.filter(lambda s: s.startswith("p"))
+    assert p_strings.to_list() == ["python"]
+
+  def test_filter_empty_result(self):
+    """Test filter that results in empty pipeline."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+
+    # Filter that matches nothing
+    empty_result = pipeline.filter(lambda x: x > 10)
+    assert empty_result.to_list() == []
+
+  def test_filter_all_pass(self):
+    """Test filter where all items pass."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+
+    # Filter that passes everything
+    all_pass = pipeline.filter(lambda x: True)
+    assert all_pass.to_list() == [1, 2, 3, 4, 5]
+
+  def test_filter_chaining(self):
+    """Test chaining multiple filters."""
+    pipeline = Pipeline([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
+    # Chain filters: even numbers and greater than 5
+    result = pipeline.filter(lambda x: x % 2 == 0).filter(lambda x: x > 5)
+    assert result.to_list() == [6, 8, 10]
+
+
+class TestPipelineMapping:
+  """Test Pipeline mapping functionality."""
+
+  def test_map_basic(self):
+    """Test basic mapping operations."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+
+    # Double each number
+    doubled = pipeline.map(lambda x: x * 2)
+    assert doubled.to_list() == [2, 4, 6, 8, 10]
+
+    # Square each number
+    squared = pipeline.map(lambda x: x**2)
+    assert squared.to_list() == [1, 4, 9, 16, 25]
+
+  def test_map_type_transformation(self):
+    """Test mapping with type transformation."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+
+    # Convert numbers to strings
+    str_pipeline = pipeline.map(str)
+    assert str_pipeline.to_list() == ["1", "2", "3", "4", "5"]
+
+    # Convert to boolean (non-zero is True)
+    bool_pipeline = pipeline.map(bool)
+    assert bool_pipeline.to_list() == [True, True, True, True, True]
+
+  def test_map_with_strings(self):
+    """Test mapping with string data."""
+    pipeline = Pipeline(["hello", "world", "python"])
+
+    # Convert to uppercase
+    upper_pipeline = pipeline.map(str.upper)
+    assert upper_pipeline.to_list() == ["HELLO", "WORLD", "PYTHON"]
+
+    # Get string lengths
+    len_pipeline = pipeline.map(len)
+    assert len_pipeline.to_list() == [5, 5, 6]
 
   def test_map_chaining(self):
     """Test chaining multiple map operations."""
-    pipeline = Pipeline()
+    pipeline = Pipeline([1, 2, 3, 4, 5])
 
-    # Chain multiple maps: 5 * 2 = 10, 10 + 1 = 11
-    result = pipeline.map(lambda x: x * 2).map(lambda x: x + 1).run(5)
-    assert result == 11
+    # Chain maps: double, then add 1
+    result = pipeline.map(lambda x: x * 2).map(lambda x: x + 1)
+    assert result.to_list() == [3, 5, 7, 9, 11]
 
-  def test_map_failure_handling(self):
-    """Test that map failures are handled properly."""
-    pipeline = Pipeline()
+  def test_map_empty_pipeline(self):
+    """Test mapping on empty pipeline."""
+    empty_pipeline = Pipeline([])
 
-    # Division by zero should cause failure
-    result = pipeline.map(lambda x: x / 0).run(5)
+    # Map should return empty result
+    result = empty_pipeline.map(lambda x: x * 2)
+    assert result.to_list() == []
+
+
+class TestPipelineMapFilter:
+  """Test Pipeline map and filter combinations."""
+
+  def test_map_then_filter(self):
+    """Test mapping then filtering."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+
+    # Double numbers, then filter even results
+    result = pipeline.map(lambda x: x * 2).filter(lambda x: x % 2 == 0)
+    assert result.to_list() == [2, 4, 6, 8, 10]
+
+  def test_filter_then_map(self):
+    """Test filtering then mapping."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+
+    # Filter even numbers, then double them
+    result = pipeline.filter(lambda x: x % 2 == 0).map(lambda x: x * 2)
+    assert result.to_list() == [4, 8]
+
+  def test_complex_map_filter_chain(self):
+    """Test complex chaining of map and filter operations."""
+    pipeline = Pipeline([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
+    # Complex chain: filter odd, multiply by 3, filter > 10
+    result = (
+      pipeline.filter(lambda x: x % 2 == 1)  # [1, 3, 5, 7, 9]
+      .map(lambda x: x * 3)  # [3, 9, 15, 21, 27]
+      .filter(lambda x: x > 10)
+    )  # [15, 21, 27]
+
+    assert result.to_list() == [15, 21, 27]
+
+
+class TestPipelineReduce:
+  """Test Pipeline reduce functionality."""
+
+  def test_reduce_basic(self):
+    """Test basic reduce operations."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+
+    # Sum all numbers
+    sum_result = pipeline.reduce(lambda acc, x: acc + x, 0)
+    assert sum_result.first() == 15
+
+    # Multiply all numbers
+    product_result = pipeline.reduce(lambda acc, x: acc * x, 1)
+    assert product_result.first() == 120
+
+  def test_reduce_with_strings(self):
+    """Test reduce with string data."""
+    pipeline = Pipeline(["hello", "world", "python"])
+
+    # Concatenate strings
+    concat_result = pipeline.reduce(lambda acc, x: acc + " " + x, "")
+    assert concat_result.first() == " hello world python"
+
+    # Join with commas
+    join_result = pipeline.reduce(lambda acc, x: acc + "," + x if acc else x, "")
+    assert join_result.first() == "hello,world,python"
+
+  def test_reduce_empty_pipeline(self):
+    """Test reduce on empty pipeline."""
+    empty_pipeline = Pipeline([])
+
+    # Reduce should return initial value
+    result = empty_pipeline.reduce(lambda acc, x: acc + x, 10)
+    assert result.first() == 10
+
+  def test_reduce_single_item(self):
+    """Test reduce with single item."""
+    single_pipeline = Pipeline([42])
+
+    # Should combine initial value with single item
+    result = single_pipeline.reduce(lambda acc, x: acc + x, 10)
+    assert result.first() == 52
+
+
+class TestPipelineTap:
+  """Test Pipeline tap functionality."""
+
+  def test_tap_basic(self):
+    """Test basic tap operations."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+    side_effects = []
+
+    # Tap to collect side effects
+    result = pipeline.tap(side_effects.append)
+    result_list = result.to_list()
+
+    assert result_list == [1, 2, 3, 4, 5]
+    assert side_effects == [1, 2, 3, 4, 5]
+
+  def test_tap_with_print(self):
+    """Test tap with print (no assertion needed, just verify it works)."""
+    pipeline = Pipeline([1, 2, 3])
+
+    # This should not raise any exceptions
+    result = pipeline.tap(lambda x: None)  # Mock print
+    assert result.to_list() == [1, 2, 3]
+
+  def test_tap_chaining(self):
+    """Test tap in a chain of operations."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+    side_effects = []
+
+    # Tap in middle of chain
+    result = pipeline.map(lambda x: x * 2).tap(side_effects.append).filter(lambda x: x > 5)
+
+    result_list = result.to_list()
+
+    assert result_list == [6, 8, 10]
+    assert side_effects == [2, 4, 6, 8, 10]
+
+  def test_tap_doesnt_modify_pipeline(self):
+    """Test that tap doesn't modify the pipeline data."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+
+    # Tap with function that would modify if it could
+    result = pipeline.tap(lambda x: x * 1000)
+
+    # Data should be unchanged
+    assert result.to_list() == [1, 2, 3, 4, 5]
+
+
+class TestPipelineEach:
+  """Test Pipeline each functionality."""
+
+  def test_each_basic(self):
+    """Test basic each operations."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+    side_effects = []
+
+    # Each should execute function for each item
+    pipeline.each(side_effects.append)
+
+    assert side_effects == [1, 2, 3, 4, 5]
+
+  def test_each_returns_none(self):
+    """Test that each returns None."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+
+    result = pipeline.each(lambda x: None)
     assert result is None
 
-    # Exception in map function should cause failure
-    result = pipeline.map(lambda x: x.nonexistent_method()).run(5)
-    assert result is None
+  def test_each_with_empty_pipeline(self):
+    """Test each with empty pipeline."""
+    empty_pipeline = Pipeline([])
+    side_effects = []
 
-  def test_filter_basic_operation(self):
-    """Test basic filter operations."""
-    pipeline = Pipeline()
+    # Should not execute function
+    empty_pipeline.each(side_effects.append)
 
-    # Even numbers pass
-    result = pipeline.filter(lambda x: x % 2 == 0).run(4)
-    assert result == 4
+    assert side_effects == []
 
-    # Odd numbers fail
-    result = pipeline.filter(lambda x: x % 2 == 0).run(5)
-    assert result is None
+  def test_each_terminal_operation(self):
+    """Test that each is a terminal operation."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
+    side_effects = []
 
-  def test_filter_with_strings(self):
-    """Test filter operations with strings."""
-    pipeline = Pipeline()
+    # After each, pipeline should be consumed
+    pipeline.each(side_effects.append)
 
-    # Non-empty strings pass
-    result = pipeline.filter(lambda s: len(s) > 0).run("hello")
-    assert result == "hello"
+    assert side_effects == [1, 2, 3, 4, 5]
 
-    # Empty strings fail
-    result = pipeline.filter(lambda s: len(s) > 0).run("")
-    assert result is None
 
-  def test_map_filter_chaining(self):
-    """Test chaining map and filter operations."""
-    pipeline = Pipeline()
+class TestPipelineUtility:
+  """Test Pipeline utility methods."""
 
-    # 6 * 2 = 12, 12 > 10 is True
-    result = pipeline.map(lambda x: x * 2).filter(lambda x: x > 10).run(6)
-    assert result == 12
+  def test_passthrough(self):
+    """Test passthrough method."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
 
-    # 6 * 2 = 12, 12 > 20 is False
-    pipeline = Pipeline()
-    result = pipeline.map(lambda x: x * 2).filter(lambda x: x > 20).run(6)
-    assert result is None
+    # Passthrough should return the same pipeline
+    result = pipeline.passthrough()
+    assert result is pipeline
 
-  def test_reduce_sum_accumulation(self):
-    """Test reduce operation with sum accumulation."""
-    pipeline = Pipeline()
-    pipeline.reduce(lambda acc, x: acc + x, 0)
+    # Data should be unchanged
+    assert result.to_list() == [1, 2, 3, 4, 5]
 
-    # Add numbers to accumulator
-    pipeline.run(5)  # 0 + 5 = 5
-    pipeline.run(3)  # 5 + 3 = 8
-    pipeline.run(2)  # 8 + 2 = 10
+  def test_apply_single_function(self):
+    """Test apply with single function."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
 
-    # Get final result
-    result = pipeline.run(SYMBOL_END)
-    assert result == 10
+    def double_pipeline(p):
+      return p.map(lambda x: x * 2)
 
-  def test_reduce_reset_functionality(self):
-    """Test reduce reset functionality."""
-    pipeline = Pipeline()
-    pipeline.reduce(lambda acc, x: acc + x, 0)
+    result = pipeline.apply(double_pipeline)
+    assert result.to_list() == [2, 4, 6, 8, 10]
 
-    # Accumulate some values
-    pipeline.run(5)
-    pipeline.run(3)
+  def test_apply_multiple_functions(self):
+    """Test apply with multiple functions."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
 
-    # Reset and start over
-    pipeline.run(SYMBOL_RESET)
-    pipeline.run(7)
+    def double_pipeline(p):
+      return p.map(lambda x: x * 2)
 
-    result = pipeline.run(SYMBOL_END)
-    assert result == 7
+    def filter_even(p):
+      return p.filter(lambda x: x % 2 == 0)
 
-  def test_reduce_list_accumulation(self):
-    """Test reduce operation with list accumulation."""
-    pipeline = Pipeline()
-    pipeline.reduce(lambda acc, x: acc + [x], [])
+    result = pipeline.apply(double_pipeline, filter_even)
+    assert result.to_list() == [2, 4, 6, 8, 10]
 
-    pipeline.run("a")
-    pipeline.run("b")
-    pipeline.run("c")
+  def test_apply_no_functions(self):
+    """Test apply with no functions."""
+    pipeline = Pipeline([1, 2, 3, 4, 5])
 
-    result = pipeline.run(SYMBOL_END)
-    assert result == ["a", "b", "c"]
+    # Should return the same pipeline
+    result = pipeline.apply()
+    assert result.to_list() == [1, 2, 3, 4, 5]
 
-  def test_reduce_object_accumulation(self):
-    """Test reduce operation with object accumulation."""
-    pipeline = Pipeline()
-    pipeline.reduce(lambda acc, item: {**acc, **item}, {})
+  def test_flatten_basic(self):
+    """Test basic flatten operation."""
+    pipeline = Pipeline([[1, 2], [3, 4], [5]])
 
-    pipeline.run({"name": "John"})
-    pipeline.run({"age": 30})
-    pipeline.run({"city": "NYC"})
+    result = pipeline.flatten()
+    assert result.to_list() == [1, 2, 3, 4, 5]
 
-    result = pipeline.run(SYMBOL_END)
-    assert result == {"name": "John", "age": 30, "city": "NYC"}
+  def test_flatten_with_strings(self):
+    """Test flatten with string iterables."""
+    pipeline = Pipeline(["hello", "world"])
 
-  def test_pipeline_failure_propagation(self):
-    """Test that failures propagate through the pipeline."""
-    pipeline = Pipeline()
+    result = pipeline.flatten()
+    assert result.to_list() == ["h", "e", "l", "l", "o", "w", "o", "r", "l", "d"]
 
-    # Filter that fails should make entire pipeline fail
-    result = pipeline.map(lambda x: x * 2).filter(lambda x: x > 100).map(lambda x: x + 1).run(10)
+  def test_flatten_empty_lists(self):
+    """Test flatten with empty lists."""
+    pipeline = Pipeline([[], [1, 2], [], [3]])
 
-    # 10 * 2 = 20, 20 > 100 is False, so pipeline fails
-    assert result is None
+    result = pipeline.flatten()
+    assert result.to_list() == [1, 2, 3]
 
-  def test_pipeline_with_none_input(self):
-    """Test pipeline behavior with None input."""
-    pipeline = Pipeline()
+  def test_flatten_nested_tuples(self):
+    """Test flatten with nested tuples."""
+    pipeline = Pipeline([(1, 2), (3, 4, 5), (6,)])
 
-    # Identity should pass None through
-    assert pipeline.run(None) is None
+    result = pipeline.flatten()
+    assert result.to_list() == [1, 2, 3, 4, 5, 6]
 
-    # Map should work with None if function handles it
-    pipeline = Pipeline()
-    result = pipeline.map(lambda x: x if x is None else x * 2).run(None)
-    assert result is None
 
-  def test_filter_exception_handling(self):
-    """Test that exceptions in filter predicates are handled."""
-    pipeline = Pipeline()
+class TestPipelineEdgeCases:
+  """Test Pipeline edge cases and error conditions."""
 
-    # Exception in predicate should cause failure
-    result = pipeline.filter(lambda x: x.nonexistent_method()).run(5)
-    assert result is None
+  def test_pipeline_with_none_values(self):
+    """Test pipeline with None values."""
+    pipeline = Pipeline([1, None, 3, None, 5])
 
-  def test_reduce_exception_handling(self):
-    """Test that exceptions in reduce accumulator are handled."""
-    pipeline = Pipeline()
-    pipeline.reduce(lambda acc, x: acc / x, 1)  # Will cause division by zero
+    # Should handle None values properly
+    result = pipeline.to_list()
+    assert result == [1, None, 3, None, 5]
 
-    pipeline.run(0)  # This should cause an exception in the accumulator
+    # Filter out None values
+    no_none = pipeline.filter(lambda x: x is not None)
+    assert no_none.to_list() == [1, 3, 5]
 
-    # The pipeline should handle the exception gracefully
-    # Note: The exact behavior depends on implementation details
-    # This test ensures no unhandled exceptions occur
+  def test_pipeline_with_mixed_types(self):
+    """Test pipeline with mixed data types."""
+    pipeline = Pipeline([1, "hello", 3.14, True, None])
+
+    # Should handle mixed types
+    result = pipeline.to_list()
+    assert result == [1, "hello", 3.14, True, None]
+
+    # Filter by type (excluding boolean which is a subclass of int)
+    numbers = pipeline.filter(lambda x: isinstance(x, int | float) and not isinstance(x, bool) and x is not None)
+    assert numbers.to_list() == [1, 3.14]
 
   def test_pipeline_reuse(self):
-    """Test that pipelines can be reused with different inputs."""
-    pipeline = Pipeline()
-    pipeline.map(lambda x: x * 2).filter(lambda x: x > 5)
+    """Test that pipelines can be reused."""
+    original_data = [1, 2, 3, 4, 5]
+    pipeline = Pipeline(original_data)
 
-    # Test with different inputs
-    assert pipeline.run(3) == 6  # 3 * 2 = 6, 6 > 5
-    assert pipeline.run(2) is None  # 2 * 2 = 4, 4 > 5 is False
-    assert pipeline.run(5) == 10  # 5 * 2 = 10, 10 > 5
+    # First use
+    result1 = pipeline.map(lambda x: x * 2).to_list()
+    assert result1 == [2, 4, 6, 8, 10]
 
-  def test_symbol_end_and_reset_constants(self):
-    """Test that SYMBOL_END and SYMBOL_RESET are proper constants."""
-    # These should be singleton instances
-    assert SYMBOL_END is SYMBOL_END
-    assert SYMBOL_RESET is SYMBOL_RESET
-    assert SYMBOL_END is not SYMBOL_RESET
+    # Create new pipeline from same data
+    pipeline2 = Pipeline(original_data)
+    result2 = pipeline2.filter(lambda x: x % 2 == 0).to_list()
+    assert result2 == [2, 4]
 
-    # Test string representations
-    assert str(SYMBOL_END) == "SymbolEnd"
-    assert str(SYMBOL_RESET) == "SymbolReset"
+  def test_pipeline_method_chaining_returns_new_instances(self):
+    """Test that pipeline methods return new instances."""
+    original = Pipeline([1, 2, 3, 4, 5])
 
-  def test_pipeline_method_chaining_returns_self(self):
-    """Test that all pipeline methods return self for chaining."""
-    pipeline = Pipeline()
+    # Methods should return new instances (except passthrough)
+    mapped = original.map(lambda x: x * 2)
+    filtered = original.filter(lambda x: x % 2 == 0)
 
-    # All these should return the same pipeline instance
-    assert pipeline.identity() is pipeline
-    assert pipeline.map(lambda x: x) is pipeline
-    assert pipeline.filter(lambda x: True) is pipeline
-    assert pipeline.reduce(lambda acc, x: acc, 0) is pipeline
+    assert mapped is not original
+    assert filtered is not original
+    assert mapped is not filtered
+
+  def test_pipeline_with_generator_exhaustion(self):
+    """Test pipeline behavior with generator exhaustion."""
+
+    def number_generator():
+      yield from range(3)
+
+    pipeline = Pipeline(number_generator())
+
+    # First consumption
+    result1 = pipeline.to_list()
+    assert result1 == [0, 1, 2]
+
+    # Generator should be exhausted now
+    # This behavior depends on the implementation
+
+
+class TestPipelineIntegration:
+  """Integration tests for Pipeline class."""
+
+  def test_data_processing_pipeline(self):
+    """Test a realistic data processing pipeline."""
+    # Simulate processing a list of user data
+    users = [
+      {"name": "Alice", "age": 30, "active": True},
+      {"name": "Bob", "age": 25, "active": False},
+      {"name": "Charlie", "age": 35, "active": True},
+      {"name": "Diana", "age": 28, "active": True},
+      {"name": "Eve", "age": 22, "active": False},
+    ]
+
+    pipeline = Pipeline(users)
+
+    # Process: filter active users, extract names, convert to uppercase
+    result = pipeline.filter(lambda user: user["active"]).map(lambda user: user["name"]).map(str.upper)
+
+    assert result.to_list() == ["ALICE", "CHARLIE", "DIANA"]
+
+  def test_number_processing_pipeline(self):
+    """Test a number processing pipeline."""
+    numbers = range(1, 21)  # 1 to 20
+
+    pipeline = Pipeline(numbers)
+
+    # Process: filter even numbers, square them, filter > 50, sum
+    result = (
+      pipeline.filter(lambda x: x % 2 == 0)  # [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+      .map(lambda x: x**2)  # [4, 16, 36, 64, 100, 144, 196, 256, 324, 400]
+      .filter(lambda x: x > 50)  # [64, 100, 144, 196, 256, 324, 400]
+      .reduce(lambda acc, x: acc + x, 0)
+    )  # 1484
+
+    assert result.first() == 1484
+
+  def test_text_processing_pipeline(self):
+    """Test a text processing pipeline."""
+    text = "Hello world! This is a test. Python is amazing."
+    words = text.split()
+
+    pipeline = Pipeline(words)
+
+    # Process: filter words > 3 chars, remove punctuation, lowercase, get unique
+    result = (
+      pipeline.filter(lambda word: len(word) > 3)
+      .map(lambda word: word.strip(".,!"))
+      .map(str.lower)
+      .filter(lambda word: word not in ["this"])
+    )  # Simple "unique" filter
+
+    expected = ["hello", "world", "test", "python", "amazing"]
+    assert result.to_list() == expected
+
+  def test_nested_data_processing(self):
+    """Test processing nested data structures."""
+    data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+
+    pipeline = Pipeline(data)
+
+    # Flatten, filter odd numbers, square them
+    result = (
+      pipeline.flatten()  # [1, 2, 3, 4, 5, 6, 7, 8, 9]
+      .filter(lambda x: x % 2 == 1)  # [1, 3, 5, 7, 9]
+      .map(lambda x: x**2)
+    )  # [1, 9, 25, 49, 81]
+
+    assert result.to_list() == [1, 9, 25, 49, 81]
