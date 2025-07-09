@@ -30,15 +30,20 @@ class Pipeline[T]:
 
   generator: Generator[list[T], None, None]
 
-  def __init__(self, source: Iterable[T], chunk_size: int = 1000):
+  def __init__(self, source: Iterable[T], chunk_size: int = 1000) -> "Pipeline[T]":
     """
     Initialize a new Pipeline with the given data source.
 
     Args:
-        source: An iterable that provides the data for the pipeline
+        source: An iterable that provides the data for the pipeline.
+               If source is another Pipeline, it will be efficiently composed.
         chunk_size: Number of elements per chunk (default: 1000)
     """
-    self.generator = self._chunked(source, chunk_size)
+    if isinstance(source, Pipeline):
+      # If source is another Pipeline, use its generator directly to avoid double-chunking
+      self.generator = source.generator
+    else:
+      self.generator = self._chunked(source, chunk_size)
 
   @staticmethod
   def _chunked(iterable: Iterable[T], size: int) -> Generator[list[T], None, None]:
@@ -58,6 +63,24 @@ class Pipeline[T]:
     p = cls([])
     p.generator = (chunk for chunk in chunks)
     return p
+
+  @classmethod
+  def from_pipeline(cls, pipeline: "Pipeline[T]") -> "Pipeline[T]":
+    """
+    Create a new Pipeline from another Pipeline.
+
+    This method provides an explicit way to create a new Pipeline from an existing one,
+    preserving the chunked structure for optimal performance.
+
+    Args:
+        pipeline: The source Pipeline to copy from
+
+    Returns:
+        A new Pipeline that will process the same data as the source
+    """
+    new_pipeline = cls([])
+    new_pipeline.generator = pipeline.generator
+    return new_pipeline
 
   def __iter__(self) -> Generator[T, None, None]:
     """Iterate over elements by flattening chunks."""
@@ -136,3 +159,21 @@ class Pipeline[T]:
       return [item for iterable in chunk for item in iterable]
 
     return Pipeline._from_chunks(flatten_chunk(chunk) for chunk in self.generator)
+
+  @classmethod
+  def chain(cls, *pipelines: "Pipeline[T]") -> "Pipeline[T]":
+    """
+    Chain multiple pipelines together sequentially.
+
+    Args:
+        *pipelines: Variable number of Pipeline instances to chain
+
+    Returns:
+        A new Pipeline that processes all input pipelines in sequence
+    """
+
+    def chain_generator():
+      for pipeline in pipelines:
+        yield from pipeline.generator
+
+    return cls._from_chunks(chain_generator())
