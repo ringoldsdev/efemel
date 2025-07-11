@@ -10,7 +10,7 @@ from collections import deque
 from collections.abc import Callable, Generator, Iterable
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import chain
-from typing import Any, Self, TypeVar
+from typing import Any, Self, TypeVar, overload
 
 T = TypeVar("T")  # Type variable for the elements in the pipeline
 U = TypeVar("U")  # Type variable for transformed elements
@@ -164,7 +164,18 @@ class Pipeline[T]:
       result = function(result)
     return result
 
-  def flatten(self: "Pipeline[Iterable[T]]") -> "Pipeline[T]":
+  @overload
+  def flatten(self: "Pipeline[list[U]]") -> "Pipeline[U]": ...
+
+  @overload
+  def flatten(self: "Pipeline[tuple[U, ...]]") -> "Pipeline[U]": ...
+
+  @overload
+  def flatten(self: "Pipeline[set[U]]") -> "Pipeline[U]": ...
+
+  def flatten(
+    self: "Pipeline[list[U]] | Pipeline[tuple[U, ...]] | Pipeline[set[U]]",
+  ) -> "Pipeline[Any]":
     """Flatten iterable chunks into a single pipeline of elements.
 
     This method flattens each chunk of iterables and maintains the chunked
@@ -174,9 +185,14 @@ class Pipeline[T]:
     Example:
         [[1, 2], [3, 4]] -> [1, 2, 3, 4]
         [(1, 2), (3, 4)] -> [1, 2, 3, 4]
+
+    Note:
+        We need to overload this method to handle different iterable types because
+        using Iterable[U] does not preserve the type information for the flattened elements.
+        It returns Pipeline[Any] instead of Pipeline[U], which is incorrect.
     """
 
-    def flatten_generator() -> Generator[T, None, None]:
+    def flatten_generator() -> Generator[Any, None, None]:
       """Generator that yields individual flattened items."""
       for chunk in self.generator:
         for iterable in chunk:
