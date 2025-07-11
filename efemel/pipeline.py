@@ -14,7 +14,6 @@ from typing import Any, Self, TypeVar
 
 T = TypeVar("T")  # Type variable for the elements in the pipeline
 U = TypeVar("U")  # Type variable for transformed elements
-V = TypeVar("V")  # Type variable for additional transformations
 
 
 class Pipeline[T]:
@@ -48,6 +47,8 @@ class Pipeline[T]:
       self.generator = source.generator
     else:
       self.generator = self._chunked(source, chunk_size)
+
+    self.chunk_size = chunk_size
 
   @staticmethod
   def _chunked(iterable: Iterable[T], size: int) -> Generator[list[T], None, None]:
@@ -162,13 +163,28 @@ class Pipeline[T]:
       result = function(result)
     return result
 
-  def flatten(self: "Pipeline[Iterable[U]]") -> "Pipeline[U]":
-    """Flatten pipeline of iterables into single pipeline."""
+  def flatten(self: "Pipeline[Iterable[T]]") -> "Pipeline[T]":
+    """Flatten iterable chunks into a single pipeline of elements.
 
-    def flatten_chunk(chunk: list[Iterable[U]]) -> list[U]:
-      return [item for iterable in chunk for item in iterable]
+    This method flattens each chunk of iterables and maintains the chunked
+    structure to avoid memory issues with large datasets. After flattening,
+    the data is re-chunked to maintain the original chunk_size.
 
-    return Pipeline._from_chunks(flatten_chunk(chunk) for chunk in self.generator)
+    Example:
+        [[1, 2], [3, 4]] -> [1, 2, 3, 4]
+        [(1, 2), (3, 4)] -> [1, 2, 3, 4]
+    """
+
+    def flatten_generator() -> Generator[T, None, None]:
+      """Generator that yields individual flattened items."""
+      for chunk in self.generator:
+        for iterable in chunk:
+          yield from iterable
+
+    # Re-chunk the flattened stream to maintain consistent chunk size
+    result = Pipeline._from_chunks(self._chunked(flatten_generator(), self.chunk_size))
+    result.chunk_size = self.chunk_size  # Preserve the original chunk size
+    return result
 
   def concurrent(
     self,
