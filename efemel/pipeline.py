@@ -63,10 +63,11 @@ class Pipeline[T]:
       yield chunk
 
   @classmethod
-  def _from_chunks(cls, chunks: Iterable[list[T]]) -> "Pipeline[T]":
+  def _from_chunks(cls, chunks: Iterable[list[T]], chunk_size: int = 1000) -> "Pipeline[T]":
     """Create a pipeline directly from an iterable of chunks."""
     p = cls([])
     p.generator = (chunk for chunk in chunks)
+    p.chunk_size = chunk_size
     return p
 
   @classmethod
@@ -112,7 +113,7 @@ class Pipeline[T]:
     def filter_chunk(chunk: list[T]) -> list[T]:
       return [x for x in chunk if predicate(x)]
 
-    return Pipeline._from_chunks(filter_chunk(chunk) for chunk in self.generator)
+    return Pipeline._from_chunks((filter_chunk(chunk) for chunk in self.generator), self.chunk_size)
 
   def map(self, function: Callable[[T], U]) -> "Pipeline[U]":
     """Transform elements using a function, applied per chunk."""
@@ -120,7 +121,7 @@ class Pipeline[T]:
     def map_chunk(chunk: list[T]) -> list[U]:
       return [function(x) for x in chunk]
 
-    return Pipeline._from_chunks(map_chunk(chunk) for chunk in self.generator)
+    return Pipeline._from_chunks((map_chunk(chunk) for chunk in self.generator), self.chunk_size)
 
   def reduce(self, function: Callable[[U, T], U], initial: U) -> "Pipeline[U]":
     """Reduce elements to a single value using the given function."""
@@ -138,7 +139,7 @@ class Pipeline[T]:
         function(item)
       return chunk
 
-    return Pipeline._from_chunks(tap_chunk(chunk) for chunk in self.generator)
+    return Pipeline._from_chunks((tap_chunk(chunk) for chunk in self.generator), self.chunk_size)
 
   def each(self, function: Callable[[T], Any]) -> None:
     """Apply function to each element (terminal operation)."""
@@ -182,9 +183,7 @@ class Pipeline[T]:
           yield from iterable
 
     # Re-chunk the flattened stream to maintain consistent chunk size
-    result = Pipeline._from_chunks(self._chunked(flatten_generator(), self.chunk_size))
-    result.chunk_size = self.chunk_size  # Preserve the original chunk size
-    return result
+    return Pipeline._from_chunks(self._chunked(flatten_generator(), self.chunk_size), self.chunk_size)
 
   def concurrent(
     self,
@@ -272,7 +271,7 @@ class Pipeline[T]:
               continue
 
     gen = ordered_generator() if ordered else unordered_generator()
-    return Pipeline._from_chunks(gen)
+    return Pipeline._from_chunks(gen, self.chunk_size)
 
   @classmethod
   def chain(cls, *pipelines: "Pipeline[T]") -> "Pipeline[T]":
@@ -290,4 +289,6 @@ class Pipeline[T]:
       for pipeline in pipelines:
         yield from pipeline.generator
 
-    return cls._from_chunks(chain_generator())
+    # Use chunk_size from the first pipeline, or default if no pipelines
+    chunk_size = pipelines[0].chunk_size if pipelines else 1000
+    return cls._from_chunks(chain_generator(), chunk_size)
