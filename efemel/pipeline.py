@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from concurrent.futures import FIRST_COMPLETED
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import wait
+import inspect
 from typing import Any
 from typing import NamedTuple
 from typing import Self
@@ -27,16 +28,37 @@ T = TypeVar("T")
 U = TypeVar("U")
 
 
+def _accepts_context(func: Callable) -> bool:
+  """
+  Check if a function accepts context as a second parameter.
+  Returns True if the function takes 2+ parameters, False if it takes 1 parameter.
+  """
+  try:
+    sig = inspect.signature(func)
+    param_count = len([p for p in sig.parameters.values() if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)])
+    return param_count >= 2
+  except (ValueError, TypeError):
+    # Fall back to assuming single parameter for lambda or built-in functions
+    return False
+
+
+def _call_user_function(func: Callable, value: Any, context: "PipelineContext") -> Any:
+  """
+  Call a user function with the appropriate signature.
+  If the function accepts context, call with (value, context).
+  Otherwise, call with just (value).
+  """
+  if _accepts_context(func):
+    return func(value, context)
+  else:
+    return func(value)
+
+
 class PipelineContext(TypedDict):
   """Global context available to all pipeline operations."""
+
   has_errors: bool
   errors: list[dict[str, Any]]
-
-
-class FunctionInput(TypedDict):
-  """Input passed to user functions containing value and context."""
-  value: Any
-  context: PipelineContext
 
 
 # Define a type for the internal data structure: a tuple of (value, error)
@@ -166,7 +188,7 @@ class Pipeline[T]:
       raise StopIteration("Pipeline is empty")
     return items[0]
 
-  def map[U](self, function: Callable[[FunctionInput], U]) -> "Pipeline[U]":
+  def map[U](self, function: Callable[[T], U] | Callable[[T, PipelineContext], U]) -> "Pipeline[U]":
     """Transform elements, capturing any exceptions that occur."""
 
     def map_generator() -> Generator[list[PipelineItem[U]], None, None]:
@@ -179,9 +201,9 @@ class Pipeline[T]:
             self.context["has_errors"] = True
           else:
             try:
-              # Apply the function with value and context; on success, error is None
-              input_dict = FunctionInput(value=value, context=self.context)
-              new_chunk.append(PipelineItem(function(input_dict), None, context))
+              # Apply the function with appropriate signature
+              result = _call_user_function(function, value, self.context)
+              new_chunk.append(PipelineItem(result, None, context))
             except Exception as e:
               # On failure, capture the exception
               new_chunk.append(PipelineItem(value, e, context))
@@ -190,7 +212,7 @@ class Pipeline[T]:
 
     return Pipeline._from_chunks(map_generator(), self.chunk_size, self.context)
 
-  def filter(self, predicate: Callable[[FunctionInput], bool]) -> "Pipeline[T]":
+  def filter(self, predicate: Callable[[T], bool] | Callable[[T, PipelineContext], bool]) -> "Pipeline[T]":
     """Filter elements, capturing any exceptions from the predicate."""
 
     def filter_generator() -> Generator[list[PipelineItem[T]], None, None]:
@@ -204,8 +226,8 @@ class Pipeline[T]:
             continue
           try:
             # Keep item if predicate is true
-            input_dict = FunctionInput(value=item.value, context=self.context)
-            if predicate(input_dict):
+            result = _call_user_function(predicate, item.value, self.context)
+            if result:
               new_chunk.append(item)
           except Exception as e:
             # If predicate fails, capture the error
@@ -215,7 +237,9 @@ class Pipeline[T]:
 
     return Pipeline._from_chunks(filter_generator(), self.chunk_size, self.context)
 
-  def reduce[U](self, function: Callable[[U, FunctionInput], U], initial: U) -> "Pipeline[U]":
+  def reduce[U](
+    self, function: Callable[[U, T], U] | Callable[[U, T, PipelineContext], U], initial: U
+  ) -> "Pipeline[U]":
     """
     Reduce elements to a single value (intermediate operation).
     Errored items are skipped in the reduction and passed through.
@@ -230,8 +254,19 @@ class Pipeline[T]:
             error_items.append(PipelineItem(value, error, context))
             self.context["has_errors"] = True
           else:
-            input_dict = FunctionInput(value=value, context=self.context)
-            acc = function(acc, input_dict)
+            # For reduce, we need to check for 3 parameters (acc, value, context)
+            try:
+              sig = inspect.signature(function)
+              param_count = len(
+                [p for p in sig.parameters.values() if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
+              )
+              if param_count >= 3:
+                acc = function(acc, value, self.context)
+              else:
+                acc = function(acc, value)
+            except (ValueError, TypeError):
+              # Fall back to 2-parameter call for lambda or built-in functions
+              acc = function(acc, value)
       # Yield all collected errors first, then the final result.
       if error_items:
         yield error_items
@@ -239,7 +274,7 @@ class Pipeline[T]:
 
     return Pipeline._from_chunks(reduce_generator(), self.chunk_size, self.context)
 
-  def each(self, function: Callable[[FunctionInput], Any]) -> None:
+  def each(self, function: Callable[[T], Any] | Callable[[T, PipelineContext], Any]) -> None:
     """
     Apply a function to each element (terminal operation).
 
@@ -252,8 +287,7 @@ class Pipeline[T]:
           errors.append(error)
           self.context["has_errors"] = True
         else:
-          input_dict = FunctionInput(value=value, context=self.context)
-          function(input_dict)
+          _call_user_function(function, value, self.context)
     if errors:
       raise CompoundError(errors)
 
@@ -408,7 +442,7 @@ class Pipeline[T]:
     context = pipelines[0].context if pipelines else PipelineContext(has_errors=False, errors=[])
     return cls._from_chunks(chain_generator(), chunk_size, context)
 
-  def tap(self, function: Callable[[FunctionInput], Any]) -> Self:
+  def tap(self, function: Callable[[T], Any] | Callable[[T, PipelineContext], Any]) -> Self:
     """Apply a side-effect function to each element without modifying the data."""
 
     def tap_generator() -> Generator[list[PipelineItem[T]], None, None]:
@@ -417,8 +451,7 @@ class Pipeline[T]:
           # Apply tap only to non-errored items
           if not error:
             try:
-              input_dict = FunctionInput(value=value, context=self.context)
-              function(input_dict)
+              _call_user_function(function, value, self.context)
             except Exception as e:
               # If the tap function itself fails, we should not halt the pipeline.
               # For now, we print a warning. A more advanced logger could be used here.
