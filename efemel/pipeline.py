@@ -14,6 +14,7 @@ from concurrent.futures import FIRST_COMPLETED
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import wait
 import inspect
+import threading
 from typing import Any
 from typing import NamedTuple
 from typing import Self
@@ -428,13 +429,28 @@ class Pipeline[T]:
   ) -> "Pipeline[U]":
     """Applies a pipeline function to each chunk in parallel."""
 
+    # Thread-safe context merging
+    context_lock = threading.Lock()
+    merged_errors: list[dict[str, Any]] = []
+
     def apply_to_chunk(chunk: list[PipelineItem[T]]) -> list[PipelineItem[U]]:
-      # Create a mini-pipeline from the single chunk of (value, error) tuples.
-      # The chunk size is len(chunk) to ensure it's processed as one unit.
-      chunk_pipeline = Pipeline._from_chunks([chunk], len(chunk), self.context)
+      # Create an isolated context for this thread to avoid race conditions
+      isolated_context = PipelineContext(has_errors=False, errors=[])
+
+      # Create a mini-pipeline from the single chunk with isolated context
+      chunk_pipeline = Pipeline._from_chunks([chunk], len(chunk), isolated_context)
       processed_pipeline = pipeline_func(chunk_pipeline)
-      # The result is already a list of chunks of tuples, so we flatten it by one level.
-      return [item for processed_chunk in processed_pipeline.generator for item in processed_chunk]
+
+      # Collect results and merge context thread-safely
+      result = [item for processed_chunk in processed_pipeline.generator for item in processed_chunk]
+
+      # Thread-safe context merging
+      if isolated_context["has_errors"] or isolated_context["errors"]:
+        with context_lock:
+          self.context["has_errors"] = True
+          merged_errors.extend(isolated_context["errors"])
+
+      return result
 
     def process_in_pool(
       gen_func: Callable[[], Generator[list[PipelineItem[U]], None, None]],
@@ -464,7 +480,14 @@ class Pipeline[T]:
       else:
         return unordered_generator(executor)
 
-    return Pipeline._from_chunks(process_in_pool(gen), self.chunk_size, self.context)
+    # Process all chunks and collect results
+    result_pipeline = Pipeline._from_chunks(process_in_pool(gen), self.chunk_size, self.context)
+
+    # Final context merge after all threads complete
+    with context_lock:
+      self.context["errors"].extend(merged_errors)
+
+    return result_pipeline
 
   # All other methods like tap, noop, etc. can be adapted similarly
   # to handle the (value, error) tuple structure.
