@@ -28,30 +28,17 @@ T = TypeVar("T")
 U = TypeVar("U")
 
 
-def _accepts_context(func: Callable) -> bool:
+def _get_function_arity(func: Callable) -> int:
   """
-  Check if a function accepts context as a second parameter.
-  Returns True if the function takes 2+ parameters, False if it takes 1 parameter.
+  Determine how many parameters a function accepts.
+  Returns the number of positional parameters the function expects.
   """
   try:
     sig = inspect.signature(func)
-    param_count = len([p for p in sig.parameters.values() if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)])
-    return param_count >= 2
+    return len([p for p in sig.parameters.values() if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)])
   except (ValueError, TypeError):
     # Fall back to assuming single parameter for lambda or built-in functions
-    return False
-
-
-def _call_user_function(func: Callable, value: Any, context: "PipelineContext") -> Any:
-  """
-  Call a user function with the appropriate signature.
-  If the function accepts context, call with (value, context).
-  Otherwise, call with just (value).
-  """
-  if _accepts_context(func):
-    return func(value, context)
-  else:
-    return func(value)
+    return 1
 
 
 class PipelineContext(TypedDict):
@@ -191,6 +178,10 @@ class Pipeline[T]:
   def map[U](self, function: Callable[[T], U] | Callable[[T, PipelineContext], U]) -> "Pipeline[U]":
     """Transform elements, capturing any exceptions that occur."""
 
+    # Check function arity once upfront for efficiency
+    func_arity = _get_function_arity(function)
+    accepts_context = func_arity >= 2
+
     def map_generator() -> Generator[list[PipelineItem[U]], None, None]:
       for chunk in self.generator:
         new_chunk: list[PipelineItem[U]] = []
@@ -202,7 +193,10 @@ class Pipeline[T]:
           else:
             try:
               # Apply the function with appropriate signature
-              result = _call_user_function(function, value, self.context)
+              if accepts_context:
+                result = function(value, self.context)
+              else:
+                result = function(value)
               new_chunk.append(PipelineItem(result, None, context))
             except Exception as e:
               # On failure, capture the exception
@@ -215,6 +209,10 @@ class Pipeline[T]:
   def filter(self, predicate: Callable[[T], bool] | Callable[[T, PipelineContext], bool]) -> "Pipeline[T]":
     """Filter elements, capturing any exceptions from the predicate."""
 
+    # Check function arity once upfront for efficiency
+    func_arity = _get_function_arity(predicate)
+    accepts_context = func_arity >= 2
+
     def filter_generator() -> Generator[list[PipelineItem[T]], None, None]:
       for chunk in self.generator:
         new_chunk: list[PipelineItem[T]] = []
@@ -226,7 +224,10 @@ class Pipeline[T]:
             continue
           try:
             # Keep item if predicate is true
-            result = _call_user_function(predicate, item.value, self.context)
+            if accepts_context:
+              result = predicate(item.value, self.context)
+            else:
+              result = predicate(item.value)
             if result:
               new_chunk.append(item)
           except Exception as e:
@@ -248,25 +249,26 @@ class Pipeline[T]:
     def reduce_generator() -> Generator[list[PipelineItem[U]], None, None]:
       acc = initial
       error_items: list[PipelineItem[U]] = []
+
+      # Check function arity once upfront for efficiency
+      func_arity = _get_function_arity(function)
+      accepts_context = func_arity >= 3  # For reduce: acc, value, context
+
       for chunk in self.generator:
         for value, error, context in chunk:
           if error:
             error_items.append(PipelineItem(value, error, context))
             self.context["has_errors"] = True
           else:
-            # For reduce, we need to check for 3 parameters (acc, value, context)
             try:
-              sig = inspect.signature(function)
-              param_count = len(
-                [p for p in sig.parameters.values() if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
-              )
-              if param_count >= 3:
+              if accepts_context:
                 acc = function(acc, value, self.context)
               else:
                 acc = function(acc, value)
-            except (ValueError, TypeError):
-              # Fall back to 2-parameter call for lambda or built-in functions
-              acc = function(acc, value)
+            except Exception as e:
+              # If reduce function fails, we still need to handle it
+              error_items.append(PipelineItem(value, e, context))
+              self.context["has_errors"] = True
       # Yield all collected errors first, then the final result.
       if error_items:
         yield error_items
@@ -280,6 +282,11 @@ class Pipeline[T]:
 
     Raises a CompoundError at the end if any exceptions were caught.
     """
+
+    # Check function arity once upfront for efficiency
+    func_arity = _get_function_arity(function)
+    accepts_context = func_arity >= 2
+
     errors: list[Exception] = []
     for chunk in self.generator:
       for value, error, _ in chunk:
@@ -287,7 +294,14 @@ class Pipeline[T]:
           errors.append(error)
           self.context["has_errors"] = True
         else:
-          _call_user_function(function, value, self.context)
+          try:
+            if accepts_context:
+              function(value, self.context)
+            else:
+              function(value)
+          except Exception as e:
+            errors.append(e)
+            self.context["has_errors"] = True
     if errors:
       raise CompoundError(errors)
 
@@ -445,13 +459,20 @@ class Pipeline[T]:
   def tap(self, function: Callable[[T], Any] | Callable[[T, PipelineContext], Any]) -> Self:
     """Apply a side-effect function to each element without modifying the data."""
 
+    # Check function arity once upfront for efficiency
+    func_arity = _get_function_arity(function)
+    accepts_context = func_arity >= 2
+
     def tap_generator() -> Generator[list[PipelineItem[T]], None, None]:
       for chunk in self.generator:
         for value, error, _ in chunk:
           # Apply tap only to non-errored items
           if not error:
             try:
-              _call_user_function(function, value, self.context)
+              if accepts_context:
+                function(value, self.context)
+              else:
+                function(value)
             except Exception as e:
               # If the tap function itself fails, we should not halt the pipeline.
               # For now, we print a warning. A more advanced logger could be used here.
