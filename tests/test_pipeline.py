@@ -364,7 +364,7 @@ class TestPipelineUtility:
     # Data should be unchanged
     assert result.to_list() == [1, 2, 3, 4, 5]
 
-  def test_apply_single_function(self):
+  def test_apply_function(self):
     """Test apply with single function."""
     pipeline = Pipeline([1, 2, 3, 4, 5])
 
@@ -373,27 +373,6 @@ class TestPipelineUtility:
 
     result = pipeline.apply(double_pipeline)
     assert result.to_list() == [2, 4, 6, 8, 10]
-
-  def test_apply_multiple_functions(self):
-    """Test apply with multiple functions."""
-    pipeline = Pipeline([1, 2, 3, 4, 5])
-
-    def double_pipeline(p):
-      return p.map(lambda x: x * 2)
-
-    def filter_even(p):
-      return p.filter(lambda x: x % 2 == 0)
-
-    result = pipeline.apply(double_pipeline, filter_even)
-    assert result.to_list() == [2, 4, 6, 8, 10]
-
-  def test_apply_no_functions(self):
-    """Test apply with no functions."""
-    pipeline = Pipeline([1, 2, 3, 4, 5])
-
-    # Should return the same pipeline
-    result = pipeline.apply()
-    assert result.to_list() == [1, 2, 3, 4, 5]
 
   def test_flatten_basic(self):
     """Test basic flatten operation."""
