@@ -226,9 +226,6 @@ class Pipeline[T]:
   def map[U](self, function: Callable[[T], U] | Callable[[T, PipelineContext], U]) -> "Pipeline[U]":
     """Transform elements, capturing any exceptions that occur."""
 
-    # Create a standardized function that always takes just value
-    std_function = _create_context_aware_function(function, self.context)
-
     def map_generator() -> Generator[list[PipelineItem[U]], None, None]:
       for chunk in self.generator:
         new_chunk: list[PipelineItem[U]] = []
@@ -239,6 +236,8 @@ class Pipeline[T]:
             self.context["has_errors"] = True
           else:
             try:
+              # Create a standardized function using the item's specific context
+              std_function = _create_context_aware_function(function, context)
               # Apply the standardized function
               result = std_function(value)
               new_chunk.append(PipelineItem(result, None, context))
@@ -432,21 +431,27 @@ class Pipeline[T]:
     # Thread-safe context merging
     context_lock = threading.Lock()
     merged_errors: list[dict[str, Any]] = []
+    isolated_contexts: list[PipelineContext] = []
 
     def apply_to_chunk(chunk: list[PipelineItem[T]]) -> list[PipelineItem[U]]:
-      # Create an isolated context for this thread to avoid race conditions
+      # Create an isolated context for this thread, copying the main context
       isolated_context = PipelineContext(has_errors=False, errors=[])
+      # Copy any existing context fields from main context
+      isolated_context.update(self.context)
+      isolated_context["has_errors"] = False
+      isolated_context["errors"] = []
 
       # Create a mini-pipeline from the single chunk with isolated context
       chunk_pipeline = Pipeline._from_chunks([chunk], len(chunk), isolated_context)
       processed_pipeline = pipeline_func(chunk_pipeline)
 
-      # Collect results and merge context thread-safely
+      # Collect results and store context for later merging
       result = [item for processed_chunk in processed_pipeline.generator for item in processed_chunk]
 
-      # Thread-safe context merging
-      if isolated_context["has_errors"] or isolated_context["errors"]:
-        with context_lock:
+      # Thread-safe context collection
+      with context_lock:
+        isolated_contexts.append(isolated_context)
+        if isolated_context["has_errors"] or isolated_context["errors"]:
           self.context["has_errors"] = True
           merged_errors.extend(isolated_context["errors"])
 
@@ -486,6 +491,23 @@ class Pipeline[T]:
     # Final context merge after all threads complete
     with context_lock:
       self.context["errors"].extend(merged_errors)
+
+      # Merge all context fields from isolated contexts
+      for isolated_context in isolated_contexts:
+        for key, value in isolated_context.items():
+          if key not in ["has_errors", "errors"]:  # Skip standard fields already handled
+            if key in self.context:
+              # If the field already exists, merge it intelligently
+              if isinstance(value, list) and isinstance(self.context[key], list):
+                self.context[key].extend(value)
+              elif isinstance(value, dict) and isinstance(self.context[key], dict):
+                self.context[key].update(value)
+              else:
+                # For other types, use the latest value
+                self.context[key] = value
+            else:
+              # New field, just add it
+              self.context[key] = value
 
     return result_pipeline
 
