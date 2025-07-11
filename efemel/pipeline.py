@@ -16,6 +16,7 @@ from concurrent.futures import wait
 from typing import Any
 from typing import NamedTuple
 from typing import Self
+from typing import TypedDict
 from typing import TypeVar
 from typing import Union
 from typing import overload
@@ -26,13 +27,25 @@ T = TypeVar("T")
 U = TypeVar("U")
 
 
+class PipelineContext(TypedDict):
+  """Global context available to all pipeline operations."""
+  has_errors: bool
+  errors: list[dict[str, Any]]
+
+
+class FunctionInput(TypedDict):
+  """Input passed to user functions containing value and context."""
+  value: Any
+  context: PipelineContext
+
+
 # Define a type for the internal data structure: a tuple of (value, error)
 class PipelineItem(NamedTuple):
   """Represents an item in the pipeline."""
 
   value: T
   error: Exception | None
-  context: dict[str, Any]
+  context: PipelineContext
 
 
 class CompoundError(Exception):
@@ -71,7 +84,7 @@ class Pipeline[T]:
   """
 
   generator: Generator[list[PipelineItem[T]], None, None]
-  context: dict[str, Any]
+  context: PipelineContext
 
   def __init__(self, source: Union[Iterable[T], "Pipeline[T]"], chunk_size: int = 1000) -> None:
     """
@@ -86,7 +99,7 @@ class Pipeline[T]:
       self.chunk_size = source.chunk_size
       self.context = source.context
     else:
-      self.context = {"has_errors": False}
+      self.context = PipelineContext(has_errors=False, errors=[])
       self.generator = self._chunked_and_wrap(source, chunk_size)
       self.chunk_size = chunk_size
 
@@ -102,7 +115,9 @@ class Pipeline[T]:
       yield chunk
 
   @classmethod
-  def _from_chunks(cls, chunks: Iterable[list[PipelineItem[T]]], chunk_size: int, context: dict) -> "Pipeline[T]":
+  def _from_chunks(
+    cls, chunks: Iterable[list[PipelineItem[T]]], chunk_size: int, context: PipelineContext
+  ) -> "Pipeline[T]":
     """Create a pipeline directly from an iterable of chunks."""
     p = cls([], chunk_size=chunk_size)
     p.generator = (chunk for chunk in chunks)
@@ -151,7 +166,7 @@ class Pipeline[T]:
       raise StopIteration("Pipeline is empty")
     return items[0]
 
-  def map[U](self, function: Callable[[T], U]) -> "Pipeline[U]":
+  def map[U](self, function: Callable[[FunctionInput], U]) -> "Pipeline[U]":
     """Transform elements, capturing any exceptions that occur."""
 
     def map_generator() -> Generator[list[PipelineItem[U]], None, None]:
@@ -164,8 +179,9 @@ class Pipeline[T]:
             self.context["has_errors"] = True
           else:
             try:
-              # Apply the function; on success, error is None
-              new_chunk.append(PipelineItem(function(value), None, context))
+              # Apply the function with value and context; on success, error is None
+              input_dict = FunctionInput(value=value, context=self.context)
+              new_chunk.append(PipelineItem(function(input_dict), None, context))
             except Exception as e:
               # On failure, capture the exception
               new_chunk.append(PipelineItem(value, e, context))
@@ -174,7 +190,7 @@ class Pipeline[T]:
 
     return Pipeline._from_chunks(map_generator(), self.chunk_size, self.context)
 
-  def filter(self, predicate: Callable[[T], bool]) -> "Pipeline[T]":
+  def filter(self, predicate: Callable[[FunctionInput], bool]) -> "Pipeline[T]":
     """Filter elements, capturing any exceptions from the predicate."""
 
     def filter_generator() -> Generator[list[PipelineItem[T]], None, None]:
@@ -188,7 +204,8 @@ class Pipeline[T]:
             continue
           try:
             # Keep item if predicate is true
-            if predicate(item.value):
+            input_dict = FunctionInput(value=item.value, context=self.context)
+            if predicate(input_dict):
               new_chunk.append(item)
           except Exception as e:
             # If predicate fails, capture the error
@@ -198,7 +215,7 @@ class Pipeline[T]:
 
     return Pipeline._from_chunks(filter_generator(), self.chunk_size, self.context)
 
-  def reduce[U](self, function: Callable[[U, T], U], initial: U) -> "Pipeline[U]":
+  def reduce[U](self, function: Callable[[U, FunctionInput], U], initial: U) -> "Pipeline[U]":
     """
     Reduce elements to a single value (intermediate operation).
     Errored items are skipped in the reduction and passed through.
@@ -213,7 +230,8 @@ class Pipeline[T]:
             error_items.append(PipelineItem(value, error, context))
             self.context["has_errors"] = True
           else:
-            acc = function(acc, value)
+            input_dict = FunctionInput(value=value, context=self.context)
+            acc = function(acc, input_dict)
       # Yield all collected errors first, then the final result.
       if error_items:
         yield error_items
@@ -221,7 +239,7 @@ class Pipeline[T]:
 
     return Pipeline._from_chunks(reduce_generator(), self.chunk_size, self.context)
 
-  def each(self, function: Callable[[T], Any]) -> None:
+  def each(self, function: Callable[[FunctionInput], Any]) -> None:
     """
     Apply a function to each element (terminal operation).
 
@@ -234,7 +252,8 @@ class Pipeline[T]:
           errors.append(error)
           self.context["has_errors"] = True
         else:
-          function(value)
+          input_dict = FunctionInput(value=value, context=self.context)
+          function(input_dict)
     if errors:
       raise CompoundError(errors)
 
@@ -260,13 +279,18 @@ class Pipeline[T]:
     Returns:
         A new pipeline that continues with the (potentially errored) items.
     """
+    # Initialize errors list in context if not present
+    if "errors" not in self.context:
+      self.context["errors"] = []
+
     processed_pipeline = pipeline_func(self)
 
     def error_tapping_generator() -> Generator[list[PipelineItem[U]], None, None]:
       for chunk in processed_pipeline.generator:
-        for _, error, _ in chunk:
+        for value, error, _ in chunk:
           if error:
             self.context["has_errors"] = True
+            self.context["errors"].append({"value": value, "error": error})
             try:
               on_error(error)
             except Exception as e:
@@ -381,10 +405,10 @@ class Pipeline[T]:
         yield from pipeline.generator
 
     chunk_size = pipelines[0].chunk_size if pipelines else 1000
-    context = pipelines[0].context if pipelines else {}
+    context = pipelines[0].context if pipelines else PipelineContext(has_errors=False, errors=[])
     return cls._from_chunks(chain_generator(), chunk_size, context)
 
-  def tap(self, function: Callable[[T], Any]) -> Self:
+  def tap(self, function: Callable[[FunctionInput], Any]) -> Self:
     """Apply a side-effect function to each element without modifying the data."""
 
     def tap_generator() -> Generator[list[PipelineItem[T]], None, None]:
@@ -393,7 +417,8 @@ class Pipeline[T]:
           # Apply tap only to non-errored items
           if not error:
             try:
-              function(value)
+              input_dict = FunctionInput(value=value, context=self.context)
+              function(input_dict)
             except Exception as e:
               # If the tap function itself fails, we should not halt the pipeline.
               # For now, we print a warning. A more advanced logger could be used here.
