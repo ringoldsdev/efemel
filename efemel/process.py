@@ -1,7 +1,7 @@
-import importlib.util
-import sys
 from importlib.abc import MetaPathFinder
+import importlib.util
 from pathlib import Path
+import sys
 
 
 class EnvironmentModuleFinder(MetaPathFinder):

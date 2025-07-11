@@ -1,9 +1,9 @@
 import json
-import shutil
 from pathlib import Path
+import shutil
 
-import pytest
 from click.testing import CliRunner
+import pytest
 
 from efemel.cli import cli
 

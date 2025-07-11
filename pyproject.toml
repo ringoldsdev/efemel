@@ -52,6 +52,15 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
+[tool.ruff.lint.isort]
+force-single-line = true
+order-by-type = true
+known-first-party = ["efemel"]
+combine-as-imports = false
+force-sort-within-sections = true
+case-sensitive = false
+split-on-trailing-comma = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]

@@ -7,10 +7,17 @@ concurrent execution for performance.
 """
 
 from collections import deque
-from collections.abc import Callable, Generator, Iterable
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from collections.abc import Callable
+from collections.abc import Generator
+from collections.abc import Iterable
+from concurrent.futures import FIRST_COMPLETED
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait
 from itertools import chain
-from typing import Any, Self, TypeVar, overload
+from typing import Any
+from typing import Self
+from typing import TypeVar
+from typing import overload
 
 T = TypeVar("T")  # Type variable for the elements in the pipeline
 U = TypeVar("U")  # Type variable for transformed elements

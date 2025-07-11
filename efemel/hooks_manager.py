@@ -1,8 +1,8 @@
 # hooks_manager.py
+from collections.abc import Callable
 import importlib.util
 import os
 import sys
-from collections.abc import Callable
 from typing import Any
 
 
