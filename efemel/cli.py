@@ -1,7 +1,8 @@
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 import os
-import shutil
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+import shutil
 
 import click
 
