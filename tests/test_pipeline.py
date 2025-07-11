@@ -9,6 +9,7 @@ import pytest
 
 from efemel.pipeline import CompoundError
 from efemel.pipeline import Pipeline
+from efemel.pipeline import PipelineItem
 
 
 class TestPipelineBasics:
@@ -463,16 +464,16 @@ class TestPipelineUtility:
 
     # This is showing the internal representation of the data wheresecond value of the Tuple is the exception
     assert result == [
-      (1, None),
-      (2, None),
-      (3, None),
-      (4, None),
-      (5, None),
-      (6, None),
-      (7, None),
-      (8, None),
-      (9, None),
-      (10, None),
+      PipelineItem(1, None, {"has_errors": False}),
+      PipelineItem(2, None, {"has_errors": False}),
+      PipelineItem(3, None, {"has_errors": False}),
+      PipelineItem(4, None, {"has_errors": False}),
+      PipelineItem(5, None, {"has_errors": False}),
+      PipelineItem(6, None, {"has_errors": False}),
+      PipelineItem(7, None, {"has_errors": False}),
+      PipelineItem(8, None, {"has_errors": False}),
+      PipelineItem(9, None, {"has_errors": False}),
+      PipelineItem(10, None, {"has_errors": False}),
     ]
 
 

@@ -14,6 +14,7 @@ from concurrent.futures import FIRST_COMPLETED
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import wait
 from typing import Any
+from typing import NamedTuple
 from typing import Self
 from typing import TypeVar
 from typing import Union
@@ -24,8 +25,14 @@ T = TypeVar("T")
 # Type variable for the transformed value part
 U = TypeVar("U")
 
+
 # Define a type for the internal data structure: a tuple of (value, error)
-PipelineItem = tuple[T, Exception | None]
+class PipelineItem(NamedTuple):
+  """Represents an item in the pipeline."""
+
+  value: T
+  error: Exception | None
+  context: dict[str, Any]
 
 
 class CompoundError(Exception):
@@ -60,9 +67,11 @@ class Pipeline[T]:
   Attributes:
       generator: A generator yielding chunks of pipeline items.
       chunk_size: The number of elements to process in each chunk.
+      context: A dictionary for global pipeline state.
   """
 
   generator: Generator[list[PipelineItem[T]], None, None]
+  context: dict[str, Any]
 
   def __init__(self, source: Union[Iterable[T], "Pipeline[T]"], chunk_size: int = 1000) -> None:
     """
@@ -75,16 +84,17 @@ class Pipeline[T]:
     if isinstance(source, Pipeline):
       self.generator = source.generator
       self.chunk_size = source.chunk_size
+      self.context = source.context
     else:
+      self.context = {"has_errors": False}
       self.generator = self._chunked_and_wrap(source, chunk_size)
       self.chunk_size = chunk_size
 
-  @staticmethod
-  def _chunked_and_wrap(iterable: Iterable[T], size: int) -> Generator[list[PipelineItem[T]], None, None]:
+  def _chunked_and_wrap(self, iterable: Iterable[T], size: int) -> Generator[list[PipelineItem[T]], None, None]:
     """Break an iterable into chunks of specified size and wrap items."""
     chunk: list[PipelineItem[T]] = []
     for item in iterable:
-      chunk.append((item, None))  # Wrap each item in a (value, error) tuple
+      chunk.append(PipelineItem(item, None, self.context))  # Wrap each item
       if len(chunk) == size:
         yield chunk
         chunk = []
@@ -92,10 +102,11 @@ class Pipeline[T]:
       yield chunk
 
   @classmethod
-  def _from_chunks(cls, chunks: Iterable[list[PipelineItem[T]]], chunk_size: int) -> "Pipeline[T]":
+  def _from_chunks(cls, chunks: Iterable[list[PipelineItem[T]]], chunk_size: int, context: dict) -> "Pipeline[T]":
     """Create a pipeline directly from an iterable of chunks."""
     p = cls([], chunk_size=chunk_size)
     p.generator = (chunk for chunk in chunks)
+    p.context = context
     return p
 
   def __iter__(self) -> Generator[T, None, None]:
@@ -104,9 +115,10 @@ class Pipeline[T]:
     """
     errors: list[Exception] = []
     for chunk in self.generator:
-      for value, error in chunk:
+      for value, error, _ in chunk:
         if error:
           errors.append(error)
+          self.context["has_errors"] = True
         else:
           yield value
     if errors:
@@ -119,9 +131,10 @@ class Pipeline[T]:
     results: list[T] = []
     errors: list[Exception] = []
     for chunk in self.generator:
-      for value, error in chunk:
+      for value, error, _ in chunk:
         if error:
           errors.append(error)
+          self.context["has_errors"] = True
         else:
           results.append(value)
     if errors:
@@ -144,20 +157,22 @@ class Pipeline[T]:
     def map_generator() -> Generator[list[PipelineItem[U]], None, None]:
       for chunk in self.generator:
         new_chunk: list[PipelineItem[U]] = []
-        for value, error in chunk:
+        for value, error, context in chunk:
           if error:
             # Pass through existing errors
-            new_chunk.append((value, error))
+            new_chunk.append(PipelineItem(value, error, context))
+            self.context["has_errors"] = True
           else:
             try:
               # Apply the function; on success, error is None
-              new_chunk.append((function(value), None))
+              new_chunk.append(PipelineItem(function(value), None, context))
             except Exception as e:
               # On failure, capture the exception
-              new_chunk.append((value, e))
+              new_chunk.append(PipelineItem(value, e, context))
+              self.context["has_errors"] = True
         yield new_chunk
 
-    return Pipeline._from_chunks(map_generator(), self.chunk_size)
+    return Pipeline._from_chunks(map_generator(), self.chunk_size, self.context)
 
   def filter(self, predicate: Callable[[T], bool]) -> "Pipeline[T]":
     """Filter elements, capturing any exceptions from the predicate."""
@@ -165,21 +180,23 @@ class Pipeline[T]:
     def filter_generator() -> Generator[list[PipelineItem[T]], None, None]:
       for chunk in self.generator:
         new_chunk: list[PipelineItem[T]] = []
-        for value, error in chunk:
-          if error:
+        for item in chunk:
+          if item.error:
             # Pass through existing errors
-            new_chunk.append((value, error))
+            new_chunk.append(item)
+            self.context["has_errors"] = True
             continue
           try:
             # Keep item if predicate is true
-            if predicate(value):
-              new_chunk.append((value, None))
+            if predicate(item.value):
+              new_chunk.append(item)
           except Exception as e:
             # If predicate fails, capture the error
-            new_chunk.append((value, e))
+            new_chunk.append(PipelineItem(item.value, e, item.context))
+            self.context["has_errors"] = True
         yield new_chunk
 
-    return Pipeline._from_chunks(filter_generator(), self.chunk_size)
+    return Pipeline._from_chunks(filter_generator(), self.chunk_size, self.context)
 
   def reduce[U](self, function: Callable[[U, T], U], initial: U) -> "Pipeline[U]":
     """
@@ -191,17 +208,18 @@ class Pipeline[T]:
       acc = initial
       error_items: list[PipelineItem[U]] = []
       for chunk in self.generator:
-        for value, error in chunk:
+        for value, error, context in chunk:
           if error:
-            error_items.append((value, error))
+            error_items.append(PipelineItem(value, error, context))
+            self.context["has_errors"] = True
           else:
             acc = function(acc, value)
       # Yield all collected errors first, then the final result.
       if error_items:
         yield error_items
-      yield [(acc, None)]
+      yield [PipelineItem(acc, None, self.context)]
 
-    return Pipeline._from_chunks(reduce_generator(), self.chunk_size)
+    return Pipeline._from_chunks(reduce_generator(), self.chunk_size, self.context)
 
   def each(self, function: Callable[[T], Any]) -> None:
     """
@@ -211,9 +229,10 @@ class Pipeline[T]:
     """
     errors: list[Exception] = []
     for chunk in self.generator:
-      for value, error in chunk:
+      for value, error, _ in chunk:
         if error:
           errors.append(error)
+          self.context["has_errors"] = True
         else:
           function(value)
     if errors:
@@ -245,8 +264,9 @@ class Pipeline[T]:
 
     def error_tapping_generator() -> Generator[list[PipelineItem[U]], None, None]:
       for chunk in processed_pipeline.generator:
-        for _, error in chunk:
+        for _, error, _ in chunk:
           if error:
+            self.context["has_errors"] = True
             try:
               on_error(error)
             except Exception as e:
@@ -255,7 +275,7 @@ class Pipeline[T]:
               print(f"Error in `on_error` handler: {e}")
         yield chunk  # Pass the original chunk through
 
-    return Pipeline._from_chunks(error_tapping_generator(), self.chunk_size)
+    return Pipeline._from_chunks(error_tapping_generator(), self.chunk_size, self.context)
 
   @overload
   def flatten(self: "Pipeline[list[U]]") -> "Pipeline[U]": ...
@@ -272,20 +292,21 @@ class Pipeline[T]:
     def flatten_generator() -> Generator[list[PipelineItem[Any]], None, None]:
       current_chunk: list[PipelineItem[Any]] = []
       for chunk in self.generator:
-        for value, error in chunk:
+        for value, error, context in chunk:
           if error:
             # Pass through errored items directly
-            current_chunk.append((value, error))
+            current_chunk.append(PipelineItem(value, error, context))
+            self.context["has_errors"] = True
           elif isinstance(value, list | tuple | set):
             # Flatten the value from a successful item
             for item in value:
-              current_chunk.append((item, None))
+              current_chunk.append(PipelineItem(item, None, context))
               if len(current_chunk) == self.chunk_size:
                 yield current_chunk
                 current_chunk = []
           # Non-iterable, non-errored items are passed through as-is
           else:
-            current_chunk.append((value, None))
+            current_chunk.append(PipelineItem(value, None, context))
 
           if len(current_chunk) == self.chunk_size:
             yield current_chunk
@@ -294,7 +315,7 @@ class Pipeline[T]:
       if current_chunk:
         yield current_chunk
 
-    return Pipeline._from_chunks(flatten_generator(), self.chunk_size)
+    return Pipeline._from_chunks(flatten_generator(), self.chunk_size, self.context)
 
   def concurrent(
     self,
@@ -307,7 +328,7 @@ class Pipeline[T]:
     def apply_to_chunk(chunk: list[PipelineItem[T]]) -> list[PipelineItem[U]]:
       # Create a mini-pipeline from the single chunk of (value, error) tuples.
       # The chunk size is len(chunk) to ensure it's processed as one unit.
-      chunk_pipeline = Pipeline._from_chunks([chunk], len(chunk))
+      chunk_pipeline = Pipeline._from_chunks([chunk], len(chunk), self.context)
       processed_pipeline = pipeline_func(chunk_pipeline)
       # The result is already a list of chunks of tuples, so we flatten it by one level.
       return [item for processed_chunk in processed_pipeline.generator for item in processed_chunk]
@@ -340,14 +361,15 @@ class Pipeline[T]:
       else:
         return unordered_generator(executor)
 
-    return Pipeline._from_chunks(process_in_pool(gen), self.chunk_size)
+    return Pipeline._from_chunks(process_in_pool(gen), self.chunk_size, self.context)
 
   # All other methods like tap, noop, etc. can be adapted similarly
   # to handle the (value, error) tuple structure.
   def noop(self) -> None:
     """Consume the pipeline, raising a CompoundError if any exceptions were caught."""
-    errors = [error for chunk in self.generator for _, error in chunk if error]
+    errors = [error for chunk in self.generator for _, error, _ in chunk if error]
     if errors:
+      self.context["has_errors"] = True
       raise CompoundError(errors)
 
   @classmethod
@@ -359,14 +381,15 @@ class Pipeline[T]:
         yield from pipeline.generator
 
     chunk_size = pipelines[0].chunk_size if pipelines else 1000
-    return cls._from_chunks(chain_generator(), chunk_size)
+    context = pipelines[0].context if pipelines else {}
+    return cls._from_chunks(chain_generator(), chunk_size, context)
 
   def tap(self, function: Callable[[T], Any]) -> Self:
     """Apply a side-effect function to each element without modifying the data."""
 
     def tap_generator() -> Generator[list[PipelineItem[T]], None, None]:
       for chunk in self.generator:
-        for value, error in chunk:
+        for value, error, _ in chunk:
           # Apply tap only to non-errored items
           if not error:
             try:
@@ -377,13 +400,14 @@ class Pipeline[T]:
               print(f"Warning: Exception in tap function ignored: {e}")
         yield chunk  # Pass the original chunk through unchanged
 
-    return Pipeline._from_chunks(tap_generator(), self.chunk_size)
+    return Pipeline._from_chunks(tap_generator(), self.chunk_size, self.context)
 
   @classmethod
   def from_pipeline(cls, pipeline: "Pipeline[T]") -> "Pipeline[T]":
     """Create a new Pipeline from another Pipeline, preserving its state."""
     new_pipeline = cls([], chunk_size=pipeline.chunk_size)
     new_pipeline.generator = pipeline.generator
+    new_pipeline.context = pipeline.context
     return new_pipeline
 
   def passthrough(self) -> Self:
