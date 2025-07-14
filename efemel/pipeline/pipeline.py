@@ -38,6 +38,22 @@ class Pipeline[T]:
     # We must cast self to the new type.
     return self  # type: ignore
 
+  def transform[U](self, transformer: Callable[[Transformer[T, T]], Transformer[T, U]]) -> "Pipeline[U]":
+    """
+    Shorthand method to apply a transformation using a lambda function.
+    Creates a Transformer under the hood and applies it to the pipeline.
+
+    Args:
+        function: A callable that transforms each element from type T to type U
+
+    Returns:
+        A new Pipeline with the transformed data
+    """
+    # Create a new transformer with identity and apply the map operation
+    # We create a basic transformer and immediately map with the function
+
+    return self.apply(Transformer[T, T]().apply(transformer))
+
   def __iter__(self) -> Iterator[T]:
     """Allows the pipeline to be iterated over."""
     yield from self.processed_data
@@ -69,4 +85,8 @@ class Pipeline[T]:
 t = Transformer.init(int).map(lambda x: x * 2).reduce(lambda acc, x: acc + x, initial=0)
 # t = 1
 
+# Example using the original apply method with a full transformer
 Pipeline([1, 2, 3, 4]).apply(t).each(lambda x: print(x))
+
+# Example using the new shorthand transform method
+Pipeline([1, 2, 3, 4]).transform(lambda x: x.map(lambda y: y * 2)).each(lambda x: print(x))
