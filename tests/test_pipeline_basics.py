@@ -5,8 +5,6 @@ This module contains tests for basic Pipeline class functionality
 including initialization, iteration, and core methods.
 """
 
-import pytest
-
 from efemel.pipeline import Pipeline
 
 
@@ -15,63 +13,71 @@ class TestPipelineBasics:
 
   def test_pipeline_initialization(self):
     """Test Pipeline initialization with various iterables."""
-    # Test with list
-    pipeline = Pipeline([1, 2, 3, 4, 5])
+    # Test with default parameters
+    pipeline = Pipeline()
     assert isinstance(pipeline, Pipeline)
-    # Generator should be a generator object, not the original list
-    from types import GeneratorType
+    assert pipeline.chunk_size == 1000
+    assert isinstance(pipeline.context, dict)
 
-    assert isinstance(pipeline.generator, GeneratorType)
+    # Test with custom chunk size
+    pipeline = Pipeline(chunk_size=500)
+    assert pipeline.chunk_size == 500
 
-    # Test with tuple
-    pipeline = Pipeline((1, 2, 3))
-    assert list(pipeline) == [1, 2, 3]
+    # Test with custom context
+    from efemel.pipeline import PipelineContext
 
-    # Test with generator
-    def gen():
-      yield from range(1, 4)
-
-    pipeline = Pipeline(gen())
-    assert list(pipeline) == [1, 2, 3]
-
-    # Test with empty list
-    pipeline = Pipeline([])
-    assert list(pipeline) == []
+    custom_context = PipelineContext()
+    custom_context["key"] = "value"
+    pipeline = Pipeline(context=custom_context)
+    assert pipeline.context["key"] == "value"
 
   def test_pipeline_iteration(self):
-    """Test Pipeline iteration behavior."""
-    pipeline = Pipeline([1, 2, 3, 4, 5])
+    """Test Pipeline iteration behavior through callable interface."""
+    pipeline = Pipeline()
 
-    # Test iteration
+    # Test iteration via __call__
+    data = [1, 2, 3, 4, 5]
     result = []
-    for item in pipeline:
+    for item in pipeline(data):
       result.append(item)
 
     assert result == [1, 2, 3, 4, 5]
 
+    # Test with multiple data sources
+    result2 = list(pipeline([1, 2], [3, 4, 5]))
+    assert result2 == [1, 2, 3, 4, 5]
+
   def test_to_list(self):
     """Test Pipeline.to_list() method."""
-    pipeline = Pipeline([1, 2, 3, 4, 5])
-    result = pipeline.to_list()
+    pipeline = Pipeline()
+    result = pipeline.to_list([1, 2, 3, 4, 5])
 
     assert result == [1, 2, 3, 4, 5]
     assert isinstance(result, list)
 
     # Test with empty pipeline
-    empty_pipeline = Pipeline([])
-    assert empty_pipeline.to_list() == []
+    assert pipeline.to_list([]) == []
+
+    # Test with multiple data sources
+    result2 = pipeline.to_list([1, 2], [3, 4, 5])
+    assert result2 == [1, 2, 3, 4, 5]
 
   def test_first(self):
     """Test Pipeline.first() method."""
-    pipeline = Pipeline([1, 2, 3, 4, 5])
-    assert pipeline.first() == 1
+    pipeline = Pipeline()
+    result = pipeline.first([1, 2, 3, 4, 5])
+    assert result == [1]
 
     # Test with string
-    str_pipeline = Pipeline(["hello", "world"])
-    assert str_pipeline.first() == "hello"
+    result = pipeline.first(["hello", "world"])
+    assert result == ["hello"]
+
+    # Test first n elements
+    result = pipeline.first([1, 2, 3, 4, 5], n=3)
+    assert result == [1, 2, 3]
 
   def test_first_empty_pipeline(self):
     """Test Pipeline.first() with empty pipeline."""
-    empty_pipeline = Pipeline([])
-    with pytest.raises(StopIteration):
-      empty_pipeline.first()
+    pipeline = Pipeline()
+    result = pipeline.first([])
+    assert result == []

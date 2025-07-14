@@ -22,35 +22,35 @@ class TestPipelineIntegration:
       {"name": "Eve", "age": 22, "active": False},
     ]
 
-    pipeline = Pipeline(users)
+    pipeline = Pipeline()
 
     # Process: filter active users, extract names, convert to uppercase
     result = pipeline.filter(lambda user: user["active"]).map(lambda user: user["name"]).map(str.upper)
 
-    assert result.to_list() == ["ALICE", "CHARLIE", "DIANA"]
+    assert result.to_list(users) == ["ALICE", "CHARLIE", "DIANA"]
 
   def test_number_processing_pipeline(self):
     """Test a number processing pipeline."""
     numbers = range(1, 21)  # 1 to 20
 
-    pipeline = Pipeline(numbers)
+    pipeline = Pipeline()
 
     # Process: filter even numbers, square them, filter > 50, sum
     result = (
       pipeline.filter(lambda x: x % 2 == 0)  # [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
       .map(lambda x: x**2)  # [4, 16, 36, 64, 100, 144, 196, 256, 324, 400]
       .filter(lambda x: x > 50)  # [64, 100, 144, 196, 256, 324, 400]
-      .reduce(lambda acc, x: acc + x, 0)
+      .reduce(numbers, function=lambda acc, x: acc + x, initial=0)
     )  # 1484
 
-    assert result.first() == 1484
+    assert result == 1484
 
   def test_text_processing_pipeline(self):
     """Test a text processing pipeline."""
     text = "Hello world! This is a test. Python is amazing."
     words = text.split()
 
-    pipeline = Pipeline(words)
+    pipeline = Pipeline()
 
     # Process: filter words > 3 chars, remove punctuation, lowercase, get unique
     result = (
@@ -61,13 +61,13 @@ class TestPipelineIntegration:
     )  # Simple "unique" filter
 
     expected = ["hello", "world", "test", "python", "amazing"]
-    assert result.to_list() == expected
+    assert result.to_list(words) == expected
 
   def test_nested_data_processing(self):
     """Test processing nested data structures."""
     data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 
-    pipeline = Pipeline(data)
+    pipeline = Pipeline()
 
     # Flatten, filter odd numbers, square them
     result = (
@@ -76,4 +76,4 @@ class TestPipelineIntegration:
       .map(lambda x: x**2)
     )  # [1, 9, 25, 49, 81]
 
-    assert result.to_list() == [1, 9, 25, 49, 81]
+    assert result.to_list(data) == [1, 9, 25, 49, 81]

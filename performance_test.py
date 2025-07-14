@@ -11,9 +11,12 @@ Tests are run on 1 million items, 100 times each to get statistical data.
 """
 
 import itertools
+from itertools import islice
 import statistics
 import time
-from itertools import islice
+
+from pipeline import Pipeline
+
 
 def generate_test_data(size: int = 1_000_000) -> list[int]:
   """Generate test data of specified size."""
@@ -102,10 +105,10 @@ def mutated_chunked_generator_listcomp_approach(data: list[int]) -> list[int]:
   def chunk_generator(data, chunk_size=1000):
     """Generate chunks using a generator."""
     while True:
-        chunk = list(islice(data, chunk_size))
-        if not chunk:
-            return
-        yield chunk
+      chunk = list(islice(data, chunk_size))
+      if not chunk:
+        return
+      yield chunk
 
   # Process each chunk with intermediate lists and combine
   results = []
@@ -168,7 +171,7 @@ class ChunkedPipeline:
       yield from self.transformer(chunk)
 
 
-PIPELINE = (
+CHUNKED_PIPELINE = (
   ChunkedPipeline()
   .filter(lambda x: x % 2 == 0)  # Filter even numbers
   .map(lambda x: x * 2)  # Double them
@@ -239,7 +242,7 @@ PIPELINE_GENERATOR = (
 
 def chunked_pipeline_approach(data: list[int]) -> list[int]:
   """Process data using the ChunkedPipeline class."""
-  return list(PIPELINE.run(data))
+  return list(CHUNKED_PIPELINE.run(data))
 
 
 def chunked_pipeline_generator_approach(data: list[int]) -> list[int]:
@@ -311,78 +314,82 @@ def chunked_pipeline_simple_approach(data: list[int]) -> list[int]:
   """Process data using the ChunkedPipelineSimple class."""
   return list(PIPELINE_SIMPLE.run(data))
 
+
 # Sentinel value to indicate that an item has been filtered out.
 _SKIPPED = object()
 
+
 class ChunkedPipelinePerItem:
+  """
+  A chunked pipeline that composes operations into a single function
+  operating on individual items, inspired by a callback-chaining pattern
+  to reduce the creation of intermediate lists.
+  """
+
+  def __init__(self, chunk_size=1000):
+    """Initialize the pipeline with a specified chunk size."""
+    self.chunk_size = chunk_size
+    # The transformer starts as an identity function.
+    self.transformer = lambda item: item
+
+  def _chunk_generator(self, data):
+    """A generator that yields chunks of data."""
+    data_iter = iter(data)
+    while True:
+      chunk = list(itertools.islice(data_iter, self.chunk_size))
+      if not chunk:
+        break
+      yield chunk
+
+  def pipe(self, operation):
     """
-    A chunked pipeline that composes operations into a single function
-    operating on individual items, inspired by a callback-chaining pattern
-    to reduce the creation of intermediate lists.
+    Composes the current transformer with a new item-wise operation.
+    This internal method is the core of the pipeline's composition logic.
+    """
+    prev_transformer = self.transformer
+
+    def new_transformer(item):
+      # Apply the existing chain of transformations.
+      processed_item = prev_transformer(item)
+
+      # If a previous operation (like a filter) already skipped this item,
+      # we bypass the new operation entirely.
+      if processed_item is _SKIPPED:
+        return _SKIPPED
+
+      # Apply the new operation to the result of the previous ones.
+      return operation(processed_item)
+
+    self.transformer = new_transformer
+    return self
+
+  def filter(self, predicate):
+    """
+    Adds a filter operation to the pipeline.
+
+    If the predicate returns `False`, the item is marked as skipped,
+    and no further operations in the chain will be executed on it.
     """
 
-    def __init__(self, chunk_size=1000):
-        """Initialize the pipeline with a specified chunk size."""
-        self.chunk_size = chunk_size
-        # The transformer starts as an identity function.
-        self.transformer = lambda item: item
+    def filter_operation(item):
+      return item if predicate(item) else _SKIPPED
 
-    def _chunk_generator(self, data):
-        """A generator that yields chunks of data."""
-        data_iter = iter(data)
-        while True:
-            chunk = list(itertools.islice(data_iter, self.chunk_size))
-            if not chunk:
-                break
-            yield chunk
+    return self.pipe(filter_operation)
 
-    def pipe(self, operation):
-        """
-        Composes the current transformer with a new item-wise operation.
-        This internal method is the core of the pipeline's composition logic.
-        """
-        prev_transformer = self.transformer
+  def map(self, func):
+    """Adds a map operation to transform an item."""
+    return self.pipe(func)
 
-        def new_transformer(item):
-            # Apply the existing chain of transformations.
-            processed_item = prev_transformer(item)
-            
-            # If a previous operation (like a filter) already skipped this item,
-            # we bypass the new operation entirely.
-            if processed_item is _SKIPPED:
-                return _SKIPPED
-            
-            # Apply the new operation to the result of the previous ones.
-            return operation(processed_item)
+  def run(self, data):
+    """
+    Executes the pipeline.
 
-        self.transformer = new_transformer
-        return self
+    The composed transformer function is applied to each item individually.
+    Results are yielded only if they haven't been marked as skipped.
+    """
+    for chunk in self._chunk_generator(data):
+      yield from [result for item in chunk if (result := self.transformer(item)) is not _SKIPPED]
 
-    def filter(self, predicate):
-        """
-        Adds a filter operation to the pipeline.
-
-        If the predicate returns `False`, the item is marked as skipped,
-        and no further operations in the chain will be executed on it.
-        """
-        def filter_operation(item):
-            return item if predicate(item) else _SKIPPED
-
-        return self.pipe(filter_operation)
-
-    def map(self, func):
-        """Adds a map operation to transform an item."""
-        return self.pipe(func)
-
-    def run(self, data):
-        """
-        Executes the pipeline.
-
-        The composed transformer function is applied to each item individually.
-        Results are yielded only if they haven't been marked as skipped.
-        """
-        for chunk in self._chunk_generator(data):
-            yield from [result for item in chunk if (result := self.transformer(item)) is not _SKIPPED]
 
 PIPELINE_PER_ITEM = (
   ChunkedPipelinePerItem()
@@ -392,9 +399,25 @@ PIPELINE_PER_ITEM = (
   .map(lambda x: x + 1)
 )
 
+
 def chunked_pipeline_per_item_approach(data) -> list[int]:
   """Process data using the ChunkedPipelinePerItem class."""
   return list(PIPELINE_PER_ITEM.run(data))
+
+
+PIPELINE = (
+  Pipeline.init(int)
+  .filter(lambda x: x % 2 == 0)  # Filter even numbers
+  .map(lambda x: x * 2)  # Double them
+  .filter(lambda x: x > 100)  # Filter > 100
+  .map(lambda x: x + 1)
+)
+
+
+def pipeline_approach(data: list[int]) -> list[int]:
+  """Process data using the Pipeline class."""
+  return PIPELINE.to_list(data)
+
 
 def time_function(func, *args, **kwargs) -> float:
   """Time a function execution and return duration in seconds."""
@@ -414,16 +437,17 @@ def run_performance_test():
     # "Generators": generator_approach,
     # "Map/Filter": builtin_map_filter_approach,
     # "GeneratorExpression": generator_expression_approach,
-    "ChunkedPipeline": chunked_pipeline_approach,
-    "ChunkedPipelinePerItem": chunked_pipeline_per_item_approach,
-    "ChunkedPipelineGenerator": chunked_pipeline_generator_approach,
-    "ChunkedPipelineSimple": chunked_pipeline_simple_approach,
-    "ListComprehension": list_comprehension_approach,
     "ChunkedGeneratorListComp": chunked_generator_listcomp_approach,
+    "ChunkedPipeline": chunked_pipeline_approach,
+    "Pipeline": pipeline_approach,
+    # "ChunkedPipelinePerItem": chunked_pipeline_per_item_approach,
+    # "ChunkedPipelineGenerator": chunked_pipeline_generator_approach,
+    # "ChunkedPipelineSimple": chunked_pipeline_simple_approach,
+    # "ListComprehension": list_comprehension_approach,
     # "MutatedChunkedGeneratorListComp": mutated_chunked_generator_listcomp_approach,
   }
 
-  num_runs = 50
+  num_runs = 20
   results = {}
 
   for name, approach_func in approaches.items():
@@ -525,12 +549,13 @@ def run_memory_test():
     # "Generators": generator_approach,
     # "MapFilter": builtin_map_filter_approach,
     # "GeneratorExpression": generator_expression_approach,
-    "ChunkedPipeline": chunked_pipeline_approach,
-    "ChunkedPipelinePerItem": chunked_pipeline_per_item_approach,
-    "ChunkedPipelineGenerator": chunked_pipeline_generator_approach,
-    "ChunkedPipelineSimple": chunked_pipeline_simple_approach,
-    "ListComprehension": list_comprehension_approach,
     "ChunkedGeneratorListComp": chunked_generator_listcomp_approach,
+    "ChunkedPipeline": chunked_pipeline_approach,
+    "Pipeline": pipeline_approach,
+    # "ChunkedPipelinePerItem": chunked_pipeline_per_item_approach,
+    # "ChunkedPipelineGenerator": chunked_pipeline_generator_approach,
+    # "ChunkedPipelineSimple": chunked_pipeline_simple_approach,
+    # "ListComprehension": list_comprehension_approach,
     # "MutatedChunkedGeneratorListComp": mutated_chunked_generator_listcomp_approach,
   }
 
