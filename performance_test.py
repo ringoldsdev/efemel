@@ -15,7 +15,7 @@ from itertools import islice
 import statistics
 import time
 
-from pipeline import Pipeline
+from efemel.pipeline import Pipeline
 
 
 def generate_test_data(size: int = 1_000_000) -> list[int]:
@@ -54,9 +54,9 @@ def generator_approach(data: list[int]) -> list[int]:
 def builtin_map_filter_approach(data: list[int]) -> list[int]:
   """Process data using built-in map/filter chaining."""
   result = filter(lambda x: x % 2 == 0, data)  # Keep even numbers
-  result = map(lambda x: x * 2, result)  # Double them
+  result = (x * 2 for x in result)  # Double them
   result = filter(lambda x: x > 100, result)  # Keep only > 100
-  result = map(lambda x: x + 1, result)  # Add 1
+  result = (x + 1 for x in result)  # Add 1
   return list(result)
 
 

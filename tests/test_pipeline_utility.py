@@ -17,7 +17,7 @@ class TestPipelineUtility:
 
     # Create another pipeline to apply
     double_pipeline = Pipeline().map(lambda x: x * 2)
-    
+
     result = pipeline.apply(double_pipeline)
     assert result.to_list([1, 2, 3, 4, 5]) == [2, 4, 6, 8, 10]
 
@@ -44,6 +44,7 @@ class TestPipelineUtility:
 
   def test_flatten_chunked_processing(self):
     """Test that flatten works with iterators and doesn't consume entire pipeline at once."""
+
     # Create a generator that yields nested data
     def generate_nested_data():
       for i in range(10):  # Smaller range for easier testing
