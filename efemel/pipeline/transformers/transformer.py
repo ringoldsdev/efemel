@@ -41,13 +41,6 @@ class Transformer[In, Out]:
     """Create a new identity pipeline with explicit type hint."""
     return cls(chunk_size)  # type: ignore
 
-  def __call__(self, data: Iterable[In]) -> Iterator[Out]:
-    """
-    Executes the transformer on a data source.
-    """
-    for chunk in self._chunk_generator(data):
-      yield from self.transformer(chunk)
-
   def _chunk_generator(self, data: Iterable[In]) -> Iterator[list[In]]:
     """Breaks an iterable into chunks of a specified size."""
     data_iter = iter(data)
@@ -118,15 +111,27 @@ class Transformer[In, Out]:
 
     return self._pipe(tap_operation)
 
-  def reduce[U](self, function: PipelineReduceFunction, initial: U):
-    """Reduces elements to a single value (terminal operation)."""
-    reducer = self._create_reduce_function(function)
-
-    def _reduce(data: Iterable[Out]) -> Iterator[U]:
-      yield reduce(reducer, data, initial)
-
-    return _reduce
-
   def apply[T](self, t: "Transformer[Out, T]") -> "Transformer[In, T]":
     """Apply another pipeline to the current one."""
     return self._pipe(lambda chunk: t.transformer(chunk))
+
+  # Terminal operations
+  # These operations execute the transformer on a data source and yield results.
+  # If you want to operate on the results, you need to use a Pipeline and apply
+  # a different transformer to it.
+
+  def __call__(self, data: Iterable[In]) -> Iterator[Out]:
+    """
+    Executes the transformer on a data source (terminal operations).
+    """
+    for chunk in self._chunk_generator(data):
+      yield from self.transformer(chunk)
+
+  def reduce[U](self, function: PipelineReduceFunction[Out, U], initial: U):
+    """Reduces elements to a single value (terminal operation)."""
+    reducer = self._create_reduce_function(function)
+
+    def _reduce(data: Iterable[In]) -> Iterator[U]:
+      yield reduce(reducer, self(data), initial)
+
+    return _reduce
