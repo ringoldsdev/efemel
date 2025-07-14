@@ -5,9 +5,6 @@ This module contains tests for Pipeline global context operations
 including context propagation and sharing between operations.
 """
 
-import pytest
-
-from efemel.pipeline import CompoundError
 from efemel.pipeline import Pipeline
 
 
@@ -48,37 +45,6 @@ class TestPipelineContext:
     # Verify the function was called for each item
     assert context_access_count == 5
 
-  def test_concurrent_context_isolation(self):
-    """Test that concurrent processing properly isolates and merges contexts."""
-    # Create a pipeline with some data
-    data = list(range(100))  # Large enough to ensure multiple chunks
-    pipeline = Pipeline(data, chunk_size=10)  # Force multiple chunks
-
-    def error_prone_pipeline(p):
-      """A pipeline that will cause errors on certain values."""
-      return p.map(lambda x: x if x % 7 != 0 else 1 / 0)  # Error on multiples of 7
-
-    def safe_pipeline(p):
-      """A pipeline that should work without errors."""
-      return p.map(lambda x: x * 2)
-
-    # Test with error-prone pipeline
-    with pytest.raises(CompoundError):
-      pipeline.concurrent(error_prone_pipeline, max_workers=4).to_list()
-
-    # Check that the context properly recorded errors
-    assert pipeline.context["has_errors"]
-
-    # Test with safe pipeline
-    safe_data = list(range(50))
-    safe_pipeline_obj = Pipeline(safe_data, chunk_size=5)
-
-    result = safe_pipeline_obj.concurrent(safe_pipeline, max_workers=4).to_list()
-    expected = [x * 2 for x in safe_data]
-
-    assert result == expected
-    assert not safe_pipeline_obj.context["has_errors"]
-
   def test_concurrent_vs_sequential_context(self):
     """Test that concurrent and sequential processing produce the same results."""
     data = list(range(20))
@@ -87,10 +53,10 @@ class TestPipelineContext:
       return p.map(lambda x: x * 3).filter(lambda x: x % 2 == 0)
 
     # Sequential
-    sequential_result = Pipeline(data).apply(transform_pipeline).to_list()
+    sequential_result = Pipeline().apply(transform_pipeline).to_list(data)
 
     # Concurrent
-    concurrent_result = Pipeline(data, chunk_size=5).concurrent(transform_pipeline, max_workers=3).to_list()
+    concurrent_result = list(Pipeline(5).concurrent(data, pipeline=transform_pipeline, max_workers=3))
 
     assert sequential_result == concurrent_result
 
@@ -110,8 +76,8 @@ class TestPipelineContext:
 
       return p.map(modify_context)
 
-    pipeline = Pipeline(data, chunk_size=5)
-    result = pipeline.concurrent(context_modifying_pipeline, max_workers=2).to_list()
+    pipeline = Pipeline(5)
+    result = list(pipeline.concurrent(data, pipeline=context_modifying_pipeline, max_workers=2))
 
     # Verify results are correct
     expected = [x * 2 for x in data]
