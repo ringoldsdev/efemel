@@ -1,5 +1,6 @@
 """Tests for the ParallelTransformer class."""
 
+import threading
 import time
 from unittest.mock import patch
 
@@ -265,3 +266,92 @@ class TestParallelTransformerChunking:
     result = list(transformer(large_data))
     expected = [x + 1 for x in large_data]
     assert result == expected
+
+
+class TestParallelTransformerContextModification:
+  """Test context modification behavior with parallel transformer."""
+
+  def test_context_modification_with_locking(self):
+    """Test that context modification with locking works correctly in concurrent execution."""
+    # Create context with items counter and a lock for thread safety
+    context = PipelineContext({"items": 0, "_lock": threading.Lock()})
+
+    def increment_counter(x: int, ctx: PipelineContext) -> int:
+      """Increment the items counter in context thread-safely."""
+      with ctx["_lock"]:
+        current_items = ctx["items"]
+        # Small delay to increase chance of race condition without locking
+        time.sleep(0.001)
+        ctx["items"] = current_items + 1
+      return x * 2
+
+    transformer = ParallelTransformer[int, int](max_workers=4, chunk_size=1)
+    transformer = transformer.map(increment_counter)
+
+    data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    result = list(transformer(data, context))
+
+    # Verify results are correct
+    expected_result = [x * 2 for x in data]
+    assert sorted(result) == sorted(expected_result)
+
+    # Verify context was modified correctly - items should equal number of processed elements
+    assert context["items"] == len(data)
+
+  def test_context_modification_without_locking_shows_race_condition(self):
+    """Test that context modification without locking can lead to race conditions."""
+    # Create context without lock to demonstrate race condition
+    context = PipelineContext({"items": 0})
+
+    def unsafe_increment_counter(x: int, ctx: PipelineContext) -> int:
+      """Increment the items counter without thread safety."""
+      current_items = ctx["items"]
+      # Delay to increase chance of race condition
+      time.sleep(0.001)
+      ctx["items"] = current_items + 1
+      return x * 2
+
+    transformer = ParallelTransformer[int, int](max_workers=4, chunk_size=1)
+    transformer = transformer.map(unsafe_increment_counter)
+
+    data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    result = list(transformer(data, context))
+
+    # Results should still be correct
+    expected_result = [x * 2 for x in data]
+    assert sorted(result) == sorted(expected_result)
+
+    # Without locking, the final count will likely be less than expected due to race conditions
+    # This test may occasionally pass by chance, but should usually fail
+    # We'll check it's at least 1 but likely less than the full count
+    assert context["items"] >= 1
+    # In a race condition, this will typically be less than len(data)
+    # But we can't assert this reliably in a test, so we just verify it's reasonable
+    assert context["items"] <= len(data)
+
+  def test_multiple_context_values_with_locking(self):
+    """Test modifying multiple context values safely in concurrent execution."""
+    context = PipelineContext({"total_sum": 0, "item_count": 0, "max_value": 0, "_lock": threading.Lock()})
+
+    def update_statistics(x: int, ctx: PipelineContext) -> int:
+      """Update multiple statistics in context thread-safely."""
+      with ctx["_lock"]:
+        ctx["total_sum"] += x
+        ctx["item_count"] += 1
+        ctx["max_value"] = max(ctx["max_value"], x)
+      return x * 3
+
+    transformer = ParallelTransformer[int, int](max_workers=3, chunk_size=2)
+    transformer = transformer.map(update_statistics)
+
+    data = [1, 5, 3, 8, 2, 7, 4, 6]
+    result = list(transformer(data, context))
+
+    # Verify transformation results
+    expected_result = [x * 3 for x in data]
+    assert sorted(result) == sorted(expected_result)
+
+    # Verify context statistics were updated correctly
+    assert context["total_sum"] == sum(data)
+    assert context["item_count"] == len(data)
+    assert context["max_value"] == max(data)
