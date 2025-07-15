@@ -20,12 +20,10 @@ class TestParallelTransformerBasics:
 
   def test_init_with_custom_parameters(self):
     """Test init with custom parameters."""
-    context = PipelineContext({"key": "value"})
-    transformer = ParallelTransformer[int, int](max_workers=8, ordered=False, chunk_size=500, context=context)
+    transformer = ParallelTransformer[int, int](max_workers=8, ordered=False, chunk_size=500)
     assert transformer.max_workers == 8
     assert transformer.ordered is False
     assert transformer.chunk_size == 500
-    assert transformer.context == context
 
   def test_call_executes_transformer_concurrently(self):
     """Test that calling parallel transformer executes it on data."""
@@ -81,9 +79,9 @@ class TestParallelTransformerOperations:
   def test_map_with_context_aware_function_concurrently(self):
     """Test map with context-aware function in concurrent execution."""
     context = PipelineContext({"multiplier": 3})
-    transformer = ParallelTransformer[int, int](max_workers=2, chunk_size=2, context=context)
+    transformer = ParallelTransformer[int, int](max_workers=2, chunk_size=2)
     transformer = transformer.map(lambda x, ctx: x * ctx["multiplier"])
-    result = list(transformer([1, 2, 3]))
+    result = list(transformer([1, 2, 3], context))
     assert result == [3, 6, 9]
 
   def test_flatten_concurrently(self):

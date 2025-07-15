@@ -1,7 +1,6 @@
 """Integration tests for Pipeline and Transformer working together."""
 
 from efemel.pipeline.pipeline import Pipeline
-from efemel.pipeline.transformers.transformer import PipelineContext
 from efemel.pipeline.transformers.transformer import Transformer
 
 
@@ -19,13 +18,11 @@ class TestPipelineTransformerIntegration:
 
   def test_context_sharing(self):
     """Test that context is properly shared in transformations."""
-    context = PipelineContext({"multiplier": 3, "threshold": 5})
+    context = {"multiplier": 3, "threshold": 5}
 
-    transformer = (
-      Transformer(context=context).map(lambda x, ctx: x * ctx["multiplier"]).filter(lambda x, ctx: x > ctx["threshold"])
-    )
+    transformer = Transformer().map(lambda x, ctx: x * ctx["multiplier"]).filter(lambda x, ctx: x > ctx["threshold"])
 
-    result = Pipeline([1, 2, 3]).apply(transformer).to_list()
+    result = Pipeline([1, 2, 3]).context(context).apply(transformer).to_list()
     assert result == [6, 9]  # [3, 6, 9] filtered to [6, 9]
 
   def test_reduce_integration(self):

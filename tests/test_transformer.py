@@ -20,12 +20,6 @@ class TestTransformerBasics:
     result = list(transformer([1, 2, 3, 4]))
     assert result == [1, 2, 3, 4]
 
-  def test_init_with_context(self):
-    """Test init with custom context."""
-    context = PipelineContext({"key": "value"})
-    transformer = Transformer(context=context)
-    assert transformer.context == context
-
   def test_call_executes_transformer(self):
     """Test that calling transformer executes it on data."""
     transformer = Transformer.init(int)
@@ -45,8 +39,8 @@ class TestTransformerOperations:
   def test_map_with_context_aware_function(self):
     """Test map with context-aware function."""
     context = PipelineContext({"multiplier": 3})
-    transformer = Transformer(context=context).map(lambda x, ctx: x * ctx["multiplier"])
-    result = list(transformer([1, 2, 3]))
+    transformer = Transformer().map(lambda x, ctx: x * ctx["multiplier"])
+    result = list(transformer([1, 2, 3], context))
     assert result == [3, 6, 9]
 
   def test_filter_keeps_matching_elements(self):
@@ -58,8 +52,8 @@ class TestTransformerOperations:
   def test_filter_with_context_aware_function(self):
     """Test filter with context-aware function."""
     context = PipelineContext({"threshold": 3})
-    transformer = Transformer(context=context).filter(lambda x, ctx: x > ctx["threshold"])
-    result = list(transformer([1, 2, 3, 4, 5]))
+    transformer = Transformer().filter(lambda x, ctx: x > ctx["threshold"])
+    result = list(transformer([1, 2, 3, 4, 5], context))
     assert result == [4, 5]
 
   def test_flatten_list_of_lists(self):
@@ -94,8 +88,8 @@ class TestTransformerOperations:
     """Test tap with context-aware function."""
     side_effects = []
     context = PipelineContext({"prefix": "item:"})
-    transformer = Transformer(context=context).tap(lambda x, ctx: side_effects.append(f"{ctx['prefix']}{x}"))
-    result = list(transformer([1, 2, 3]))
+    transformer = Transformer().tap(lambda x, ctx: side_effects.append(f"{ctx['prefix']}{x}"))
+    result = list(transformer([1, 2, 3], context))
 
     assert result == [1, 2, 3]
     assert side_effects == ["item:1", "item:2", "item:3"]
@@ -158,9 +152,9 @@ class TestTransformerTerminalOperations:
   def test_reduce_with_context_aware_function(self):
     """Test reduce with context-aware function."""
     context = PipelineContext({"multiplier": 2})
-    transformer = Transformer(context=context)
+    transformer = Transformer()
     reducer = transformer.reduce(lambda acc, x, ctx: acc + (x * ctx["multiplier"]), initial=0)
-    result = list(reducer([1, 2, 3]))
+    result = list(reducer([1, 2, 3], context))
     assert result == [12]  # (1*2) + (2*2) + (3*2) = 2 + 4 + 6 = 12
 
   def test_reduce_with_map_chain(self):
@@ -233,12 +227,10 @@ class TestTransformerFromTransformer:
   def test_from_transformer_with_custom_parameters(self):
     """Test from_transformer with custom parameters."""
     source = Transformer.init(int).map(lambda x: x * 2)
-    context = PipelineContext({"custom": "value"})
 
-    target = Transformer.from_transformer(source, chunk_size=200, context=context)
+    target = Transformer.from_transformer(source, chunk_size=200)
 
     assert target.chunk_size == 200  # Custom chunk size
-    assert target.context == context  # Custom context
 
     # Should still have same transformation logic
     data = [1, 2, 3]

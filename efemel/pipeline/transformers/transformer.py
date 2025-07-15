@@ -13,12 +13,12 @@ from typing import overload
 DEFAULT_CHUNK_SIZE = 1000
 
 # --- Type Aliases ---
-type PipelineFunction[Out, T] = Callable[[Out], T] | Callable[[Out, PipelineContext], T]
-type PipelineReduceFunction[U, Out] = Callable[[U, Out], U] | Callable[[U, Out, PipelineContext], U]
+type PipelineFunction[Out, T] = Callable[[Out], T] | Callable[[Out, "PipelineContext"], T]
+type PipelineReduceFunction[U, Out] = Callable[[U, Out], U] | Callable[[U, Out, "PipelineContext"], U]
 
 
 class PipelineContext(dict):
-  """Global context available to all pipeline operations."""
+  """Generic, untyped context available to all pipeline operations."""
 
   pass
 
@@ -34,11 +34,10 @@ class Transformer[In, Out]:
   def __init__(
     self,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
-    context: PipelineContext | None = None,
     transformer: Callable[[list[In]], list[Out]] = lambda chunk: chunk,  # type: ignore
   ):
     self.chunk_size = chunk_size
-    self.context = context or PipelineContext()
+    self.context: PipelineContext = PipelineContext()
     self.transformer = transformer
 
   @classmethod
@@ -51,26 +50,16 @@ class Transformer[In, Out]:
     cls,
     transformer: "Transformer[T, U]",
     chunk_size: int | None = None,
-    context: PipelineContext | None = None,
   ) -> "Transformer[T, U]":
     """
     Create a new transformer from an existing transformer.
 
-    This method copies the transformation logic and context from an existing
-    transformer and applies it to a new transformer instance of the target class.
-
-    Args:
-        transformer: The base transformer to copy from.
-        **kwargs: Additional arguments to pass to the new transformer constructor.
-
-    Returns:
-        A new transformer instance with the same transformation logic.
+    This method copies the transformation logic from an existing
+    transformer and applies it to a new transformer instance. The new
+    transformer will have its own fresh context.
     """
-
-    # Create new instance with the transformer's chunk_size and context as defaults
     return cls(
       chunk_size=chunk_size or transformer.chunk_size,
-      context=context or copy.deepcopy(transformer.context),
       transformer=copy.deepcopy(transformer.transformer),  # type: ignore
     )
 
@@ -149,14 +138,15 @@ class Transformer[In, Out]:
     return t(self)
 
   # Terminal operations
-  # These operations execute the transformer on a data source and yield results.
-  # If you want to operate on the results, you need to use a Pipeline and apply
-  # a different transformer to it.
-
-  def __call__(self, data: Iterable[In]) -> Iterator[Out]:
+  def __call__(self, data: Iterable[In], context: PipelineContext | None = None) -> Iterator[Out]:
     """
     Executes the transformer on a data source (terminal operations).
     """
+    if context:
+      self.context.update(context)
+
+    print(self.context)
+
     for chunk in self._chunk_generator(data):
       yield from self.transformer(chunk)
 
@@ -164,7 +154,7 @@ class Transformer[In, Out]:
     """Reduces elements to a single value (terminal operation)."""
     reducer = self._create_reduce_function(function)
 
-    def _reduce(data: Iterable[In]) -> Iterator[U]:
-      yield reduce(reducer, self(data), initial)
+    def _reduce(data: Iterable[In], context: PipelineContext | None = None) -> Iterator[U]:
+      yield reduce(reducer, self(data, context), initial)
 
     return _reduce

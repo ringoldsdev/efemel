@@ -28,13 +28,24 @@ class Pipeline[T]:
   def __init__(self, *data: Iterable[T]):
     self.data_source: Iterable[T] = itertools.chain.from_iterable(data) if len(data) > 1 else data[0]
     self.processed_data: Iterator = iter(self.data_source)
+    self.ctx = PipelineContext()
 
-  def apply[U](self, transformer: Transformer[T, U] | Callable[[Iterable[T]], Iterator[U]]) -> "Pipeline[U]":
+  def context(self, ctx: PipelineContext) -> "Pipeline[T]":
+    """
+    Sets the context for the pipeline.
+    """
+    self.ctx = ctx
+    return self
+
+  def apply[U](
+    self, transformer: Transformer[T, U] | Callable[[Iterable[T], PipelineContext], Iterator[U]]
+  ) -> "Pipeline[U]":
     """
     Applies a transformer to the current data source.
     """
+
     # The transformer is called with the current processed data, producing a new iterator
-    new_data = transformer(self.processed_data)
+    new_data = transformer(self.processed_data, self.ctx)  # type: ignore
     # Create a new pipeline with the transformed data
     self.processed_data = new_data
     return self  # type: ignore
