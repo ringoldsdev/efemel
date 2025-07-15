@@ -73,14 +73,14 @@ class Transformer[In, Out]:
     if is_context_aware(function):
       return self._pipe(lambda chunk, ctx: [function(x, ctx) for x in chunk])
 
-    return self._pipe(lambda chunk, _ctx: [function(x) for x in chunk])
+    return self._pipe(lambda chunk, _ctx: [function(x) for x in chunk])  # type: ignore
 
   def filter(self, predicate: PipelineFunction[Out, bool]) -> "Transformer[In, Out]":
     """Filters elements, passing context explicitly to the predicate function."""
     if is_context_aware(predicate):
       return self._pipe(lambda chunk, ctx: [x for x in chunk if predicate(x, ctx)])
 
-    return self._pipe(lambda chunk, _ctx: [x for x in chunk if predicate(x)])
+    return self._pipe(lambda chunk, _ctx: [x for x in chunk if predicate(x)])  # type: ignore
 
   @overload
   def flatten[T](self: "Transformer[In, list[T]]") -> "Transformer[In, T]": ...
@@ -101,7 +101,7 @@ class Transformer[In, Out]:
     if is_context_aware(function):
       return self._pipe(lambda chunk, ctx: [x for x in chunk if function(x, ctx) or True])
 
-    return self._pipe(lambda chunk, ctx: [x for x in chunk if function(x) or True])
+    return self._pipe(lambda chunk, _ctx: [function(x) or x for x in chunk])  # type: ignore
 
   def apply[T](self, t: Callable[[Self], "Transformer[In, T]"]) -> "Transformer[In, T]":
     """Apply another pipeline to the current one."""
@@ -146,6 +146,6 @@ class Transformer[In, Out]:
 
       data_iterator = self(data, run_context)
 
-      yield reduce(function, data_iterator, initial)
+      yield reduce(function, data_iterator, initial)  # type: ignore
 
     return _reduce
