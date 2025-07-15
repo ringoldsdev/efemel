@@ -15,12 +15,13 @@ from itertools import islice
 import statistics
 import time
 
-from efemel.pipeline import Pipeline
+from efemel.pipeline.pipeline import Pipeline
+from efemel.pipeline.transformers.transformer import Transformer
 
 
 def generate_test_data(size: int = 1_000_000) -> list[int]:
   """Generate test data of specified size."""
-  return range(size)
+  return range(size)  # type: ignore
 
 
 def generator_approach(data: list[int]) -> list[int]:
@@ -54,9 +55,9 @@ def generator_approach(data: list[int]) -> list[int]:
 def builtin_map_filter_approach(data: list[int]) -> list[int]:
   """Process data using built-in map/filter chaining."""
   result = filter(lambda x: x % 2 == 0, data)  # Keep even numbers
-  result = (x * 2 for x in result)  # Double them
+  result = (x * 2 for x in result)  # type: ignore
   result = filter(lambda x: x > 100, result)  # Keep only > 100
-  result = (x + 1 for x in result)  # Add 1
+  result = (x + 1 for x in result)  # type: ignore
   return list(result)
 
 
@@ -405,8 +406,8 @@ def chunked_pipeline_per_item_approach(data) -> list[int]:
   return list(PIPELINE_PER_ITEM.run(data))
 
 
-PIPELINE = (
-  Pipeline.init(int)
+PIPELINE_TRANSFORMER = (
+  Transformer()
   .filter(lambda x: x % 2 == 0)  # Filter even numbers
   .map(lambda x: x * 2)  # Double them
   .filter(lambda x: x > 100)  # Filter > 100
@@ -416,7 +417,7 @@ PIPELINE = (
 
 def pipeline_approach(data: list[int]) -> list[int]:
   """Process data using the Pipeline class."""
-  return PIPELINE.to_list(data)
+  return Pipeline(data).apply(PIPELINE_TRANSFORMER).to_list()
 
 
 def time_function(func, *args, **kwargs) -> float:
