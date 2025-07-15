@@ -80,13 +80,3 @@ class Pipeline[T]:
     """Consumes the pipeline without returning results."""
     for _ in self.processed_data:
       pass
-
-
-t = Transformer.init(int).map(lambda x: x * 2).reduce(lambda acc, x: acc + x, initial=0)
-# t = 1
-
-# Example using the original apply method with a full transformer
-Pipeline([1, 2, 3, 4]).apply(t).each(lambda x: print(x))
-
-# Example using the new shorthand transform method
-Pipeline([1, 2, 3, 4]).transform(lambda x: x.map(lambda y: y * 2)).each(lambda x: print(x))
