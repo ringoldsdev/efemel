@@ -26,33 +26,33 @@ class Pipeline[T]:
   """
 
   def __init__(self, *data: Iterable[T]):
-    self.data_source: Iterable[T] = itertools.chain.from_iterable(data)
+    self.data_source: Iterable[T] = itertools.chain.from_iterable(data) if len(data) > 1 else data[0]
     self.processed_data: Iterator = iter(self.data_source)
 
   def apply[U](self, transformer: Transformer[T, U] | Callable[[Iterable[T]], Iterator[U]]) -> "Pipeline[U]":
     """
     Applies a transformer to the current data source.
     """
-    # The transformer is called with the current data, producing a new iterator
-    self.processed_data = transformer(self.data_source)
-    # We must cast self to the new type.
+    # The transformer is called with the current processed data, producing a new iterator
+    new_data = transformer(self.processed_data)
+    # Create a new pipeline with the transformed data
+    self.processed_data = new_data
     return self  # type: ignore
 
-  def transform[U](self, transformer: Callable[[Transformer[T, T]], Transformer[T, U]]) -> "Pipeline[U]":
+  def transform[U](self, t: Callable[[Transformer[T, T]], Transformer[T, U]]) -> "Pipeline[U]":
     """
     Shorthand method to apply a transformation using a lambda function.
     Creates a Transformer under the hood and applies it to the pipeline.
 
     Args:
-        function: A callable that transforms each element from type T to type U
+        t: A callable that takes a transformer and returns a transformed transformer
 
     Returns:
         A new Pipeline with the transformed data
     """
-    # Create a new transformer with identity and apply the map operation
-    # We create a basic transformer and immediately map with the function
-
-    return self.apply(Transformer[T, T]().apply(transformer))
+    # Create a new transformer and apply the transformation function
+    transformer = t(Transformer[T, T]())
+    return self.apply(transformer)
 
   def __iter__(self) -> Iterator[T]:
     """Allows the pipeline to be iterated over."""

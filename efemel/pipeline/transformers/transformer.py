@@ -5,6 +5,7 @@ from functools import reduce
 import inspect
 import itertools
 from typing import Any
+from typing import Self
 from typing import Union
 from typing import overload
 
@@ -111,9 +112,9 @@ class Transformer[In, Out]:
 
     return self._pipe(tap_operation)
 
-  def apply[T](self, t: "Transformer[Out, T]") -> "Transformer[In, T]":
+  def apply[T](self, t: Callable[[Self], "Transformer[In, T]"]) -> "Transformer[In, T]":
     """Apply another pipeline to the current one."""
-    return self._pipe(lambda chunk: t.transformer(chunk))
+    return t(self)
 
   # Terminal operations
   # These operations execute the transformer on a data source and yield results.

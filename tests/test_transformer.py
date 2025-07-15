@@ -1,0 +1,211 @@
+"""Tests for the Transformer class."""
+
+from efemel.pipeline.transformers.transformer import PipelineContext
+from efemel.pipeline.transformers.transformer import Transformer
+
+
+class TestTransformerBasics:
+  """Test basic transformer functionality."""
+
+  def test_init_creates_identity_transformer(self):
+    """Test that init creates an identity transformer."""
+    transformer = Transformer.init(int)
+    result = list(transformer([1, 2, 3]))
+    assert result == [1, 2, 3]
+
+  def test_init_with_chunk_size(self):
+    """Test init with custom chunk size."""
+    transformer = Transformer.init(int, chunk_size=2)
+    assert transformer.chunk_size == 2
+    result = list(transformer([1, 2, 3, 4]))
+    assert result == [1, 2, 3, 4]
+
+  def test_init_with_context(self):
+    """Test init with custom context."""
+    context = PipelineContext({"key": "value"})
+    transformer = Transformer(context=context)
+    assert transformer.context == context
+
+  def test_call_executes_transformer(self):
+    """Test that calling transformer executes it on data."""
+    transformer = Transformer.init(int)
+    result = list(transformer([1, 2, 3]))
+    assert result == [1, 2, 3]
+
+
+class TestTransformerOperations:
+  """Test transformer operations like map, filter, etc."""
+
+  def test_map_transforms_elements(self):
+    """Test map transforms each element."""
+    transformer = Transformer.init(int).map(lambda x: x * 2)
+    result = list(transformer([1, 2, 3]))
+    assert result == [2, 4, 6]
+
+  def test_map_with_context_aware_function(self):
+    """Test map with context-aware function."""
+    context = PipelineContext({"multiplier": 3})
+    transformer = Transformer(context=context).map(lambda x, ctx: x * ctx["multiplier"])
+    result = list(transformer([1, 2, 3]))
+    assert result == [3, 6, 9]
+
+  def test_filter_keeps_matching_elements(self):
+    """Test filter keeps only matching elements."""
+    transformer = Transformer.init(int).filter(lambda x: x % 2 == 0)
+    result = list(transformer([1, 2, 3, 4, 5, 6]))
+    assert result == [2, 4, 6]
+
+  def test_filter_with_context_aware_function(self):
+    """Test filter with context-aware function."""
+    context = PipelineContext({"threshold": 3})
+    transformer = Transformer(context=context).filter(lambda x, ctx: x > ctx["threshold"])
+    result = list(transformer([1, 2, 3, 4, 5]))
+    assert result == [4, 5]
+
+  def test_flatten_list_of_lists(self):
+    """Test flatten with list of lists."""
+    transformer = Transformer.init(list).flatten()
+    result = list(transformer([[1, 2], [3, 4], [5]]))
+    assert result == [1, 2, 3, 4, 5]
+
+  def test_flatten_list_of_tuples(self):
+    """Test flatten with list of tuples."""
+    transformer = Transformer.init(tuple).flatten()
+    result = list(transformer([(1, 2), (3, 4), (5,)]))
+    assert result == [1, 2, 3, 4, 5]
+
+  def test_flatten_list_of_sets(self):
+    """Test flatten with list of sets."""
+    transformer = Transformer.init(set).flatten()
+    result = list(transformer([{1, 2}, {3, 4}, {5}]))
+    # Sets are unordered, so we sort for comparison
+    assert sorted(result) == [1, 2, 3, 4, 5]
+
+  def test_tap_applies_side_effect_without_modification(self):
+    """Test tap applies side effect without modifying data."""
+    side_effects = []
+    transformer = Transformer.init(int).tap(lambda x: side_effects.append(x))
+    result = list(transformer([1, 2, 3]))
+
+    assert result == [1, 2, 3]  # Data unchanged
+    assert side_effects == [1, 2, 3]  # Side effect applied
+
+  def test_tap_with_context_aware_function(self):
+    """Test tap with context-aware function."""
+    side_effects = []
+    context = PipelineContext({"prefix": "item:"})
+    transformer = Transformer(context=context).tap(lambda x, ctx: side_effects.append(f"{ctx['prefix']}{x}"))
+    result = list(transformer([1, 2, 3]))
+
+    assert result == [1, 2, 3]
+    assert side_effects == ["item:1", "item:2", "item:3"]
+
+  def test_apply_composes_transformers(self):
+    """Test apply composes transformers."""
+    transformer1 = Transformer.init(int).map(lambda x: x * 2)
+    transformer2 = transformer1.apply(lambda t: t.filter(lambda x: x > 4))
+    result = list(transformer2([1, 2, 3, 4]))
+    assert result == [6, 8]  # [2, 4, 6, 8] filtered to [6, 8]
+
+
+class TestTransformerChaining:
+  """Test chaining multiple transformer operations."""
+
+  def test_map_then_filter(self):
+    """Test map followed by filter."""
+    transformer = Transformer.init(int).map(lambda x: x * 2).filter(lambda x: x > 4)
+    result = list(transformer([1, 2, 3, 4]))
+    assert result == [6, 8]
+
+  def test_filter_then_map(self):
+    """Test filter followed by map."""
+    transformer = Transformer.init(int).filter(lambda x: x % 2 == 0).map(lambda x: x * 3)
+    result = list(transformer([1, 2, 3, 4, 5, 6]))
+    assert result == [6, 12, 18]
+
+  def test_map_flatten_filter(self):
+    """Test map, flatten, then filter."""
+    transformer = Transformer.init(int).map(lambda x: [x, x * 2]).flatten().filter(lambda x: x > 3)
+    result = list(transformer([1, 2, 3]))
+    assert result == [4, 6]  # [[1,2], [2,4], [3,6]] -> [1,2,2,4,3,6] -> [4,6]
+
+  def test_complex_chain_with_tap(self):
+    """Test complex chain with tap for side effects."""
+    side_effects = []
+    transformer = (
+      Transformer.init(int)
+      .map(lambda x: x * 2)
+      .tap(lambda x: side_effects.append(f"doubled: {x}"))
+      .filter(lambda x: x > 4)
+      .tap(lambda x: side_effects.append(f"filtered: {x}"))
+    )
+
+    result = list(transformer([1, 2, 3, 4]))
+    assert result == [6, 8]
+    assert side_effects == ["doubled: 2", "doubled: 4", "doubled: 6", "doubled: 8", "filtered: 6", "filtered: 8"]
+
+
+class TestTransformerTerminalOperations:
+  """Test terminal operations like reduce."""
+
+  def test_reduce_sums_elements(self):
+    """Test reduce sums all elements."""
+    transformer = Transformer.init(int)
+    reducer = transformer.reduce(lambda acc, x: acc + x, initial=0)
+    result = list(reducer([1, 2, 3, 4]))
+    assert result == [10]
+
+  def test_reduce_with_context_aware_function(self):
+    """Test reduce with context-aware function."""
+    context = PipelineContext({"multiplier": 2})
+    transformer = Transformer(context=context)
+    reducer = transformer.reduce(lambda acc, x, ctx: acc + (x * ctx["multiplier"]), initial=0)
+    result = list(reducer([1, 2, 3]))
+    assert result == [12]  # (1*2) + (2*2) + (3*2) = 2 + 4 + 6 = 12
+
+  def test_reduce_with_map_chain(self):
+    """Test reduce after map transformation."""
+    transformer = Transformer.init(int).map(lambda x: x * 2)
+    reducer = transformer.reduce(lambda acc, x: acc + x, initial=0)
+    result = list(reducer([1, 2, 3]))
+    assert result == [12]  # [2, 4, 6] summed = 12
+
+
+class TestTransformerChunking:
+  """Test chunking behavior."""
+
+  def test_chunking_with_small_chunk_size(self):
+    """Test transformer works correctly with small chunk sizes."""
+    transformer = Transformer.init(int, chunk_size=2).map(lambda x: x * 2)
+    result = list(transformer([1, 2, 3, 4, 5]))
+    assert result == [2, 4, 6, 8, 10]
+
+  def test_chunking_with_large_data(self):
+    """Test transformer works correctly with large datasets."""
+    transformer = Transformer.init(int, chunk_size=100).map(lambda x: x + 1)
+    large_data = list(range(1000))
+    result = list(transformer(large_data))
+    expected = [x + 1 for x in large_data]
+    assert result == expected
+
+
+class TestTransformerEdgeCases:
+  """Test edge cases for transformer."""
+
+  def test_empty_data(self):
+    """Test transformer with empty data."""
+    transformer = Transformer.init(int).map(lambda x: x * 2)
+    result = list(transformer([]))
+    assert result == []
+
+  def test_single_element(self):
+    """Test transformer with single element."""
+    transformer = Transformer.init(int).map(lambda x: x * 2).filter(lambda x: x > 0)
+    result = list(transformer([5]))
+    assert result == [10]
+
+  def test_filter_removes_all_elements(self):
+    """Test filter that removes all elements."""
+    transformer = Transformer.init(int).filter(lambda x: x > 100)
+    result = list(transformer([1, 2, 3]))
+    assert result == []
