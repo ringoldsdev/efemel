@@ -1,6 +1,7 @@
 """Integration tests for Pipeline and Transformer working together."""
 
 from efemel.pipeline.pipeline import Pipeline
+from efemel.pipeline.transformers.parallel import ParallelTransformer
 from efemel.pipeline.transformers.transformer import PipelineContext
 from efemel.pipeline.transformers.transformer import Transformer
 
@@ -19,13 +20,11 @@ class TestPipelineTransformerIntegration:
 
   def test_context_sharing(self):
     """Test that context is properly shared in transformations."""
-    context = PipelineContext({"multiplier": 3, "threshold": 5})
+    context = {"multiplier": 3, "threshold": 5}
 
-    transformer = (
-      Transformer(context=context).map(lambda x, ctx: x * ctx["multiplier"]).filter(lambda x, ctx: x > ctx["threshold"])
-    )
+    transformer = Transformer().map(lambda x, ctx: x * ctx["multiplier"]).filter(lambda x, ctx: x > ctx["threshold"])
 
-    result = Pipeline([1, 2, 3]).apply(transformer).to_list()
+    result = Pipeline([1, 2, 3]).context(context).apply(transformer).to_list()
     assert result == [6, 9]  # [3, 6, 9] filtered to [6, 9]
 
   def test_reduce_integration(self):
@@ -219,3 +218,163 @@ class TestPipelinePerformanceIntegration:
       results.extend(batch_result)
 
     assert results == [3, 6, 9, 12, 15, 18]
+
+
+class TestPipelineParallelTransformerIntegration:
+  """Test Pipeline integration with ParallelTransformer and context modification."""
+
+  def test_pipeline_with_parallel_transformer_context_modification(self):
+    """Test pipeline calling parallel transformer that safely modifies context."""
+    # Create context with statistics to be updated by parallel processing
+    context = PipelineContext({"processed_count": 0, "sum_total": 0, "max_value": 0})
+
+    def safe_increment_and_transform(x: int, ctx: PipelineContext) -> int:
+      """Safely increment context counters and transform the value."""
+      with ctx["lock"]:
+        ctx["processed_count"] += 1
+        ctx["sum_total"] += x
+        ctx["max_value"] = max(ctx["max_value"], x)
+      return x * 2
+
+    # Create parallel transformer that modifies context safely
+    parallel_transformer = ParallelTransformer[int, int](max_workers=3, chunk_size=2)
+    parallel_transformer = parallel_transformer.map(safe_increment_and_transform)
+
+    # Use pipeline to process data with parallel transformer
+    data = [1, 5, 3, 8, 2, 7, 4, 6]
+    result = Pipeline(data).context(context).apply(parallel_transformer).to_list()
+
+    # Verify transformation results
+    expected_result = [x * 2 for x in data]
+    assert sorted(result) == sorted(expected_result)
+
+    # Verify context was safely modified by parallel workers
+    assert context["processed_count"] == len(data)
+    assert context["sum_total"] == sum(data)
+    assert context["max_value"] == max(data)
+
+  def test_pipeline_accesses_context_after_parallel_processing(self):
+    """Test that pipeline can access context data modified by parallel transformer."""
+    # Create context with counters
+    context = PipelineContext({"items_processed": 0, "even_count": 0, "odd_count": 0})
+
+    def count_and_transform(x: int, ctx: PipelineContext) -> int:
+      """Count even/odd numbers and transform."""
+      with ctx["lock"]:
+        ctx["items_processed"] += 1
+        if x % 2 == 0:
+          ctx["even_count"] += 1
+        else:
+          ctx["odd_count"] += 1
+      return x * 3
+
+    parallel_transformer = ParallelTransformer[int, int](max_workers=2, chunk_size=3)
+    parallel_transformer = parallel_transformer.map(count_and_transform)
+
+    data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    # Process with pipeline
+    pipeline = Pipeline(data).context(context)
+    result = pipeline.apply(parallel_transformer).to_list()
+
+    # Access the modified context from pipeline
+    final_context = pipeline.ctx
+
+    # Verify results
+    expected_result = [x * 3 for x in data]
+    assert sorted(result) == sorted(expected_result)
+
+    # Verify context statistics computed by parallel workers
+    assert final_context["items_processed"] == 10
+    assert final_context["even_count"] == 5  # 2, 4, 6, 8, 10
+    assert final_context["odd_count"] == 5  # 1, 3, 5, 7, 9
+
+    # Demonstrate context access after processing
+    total_processed = final_context["even_count"] + final_context["odd_count"]
+    assert total_processed == final_context["items_processed"]
+
+  def test_multiple_parallel_transformers_sharing_context(self):
+    """Test multiple parallel transformers modifying the same context."""
+    # Shared context for statistics across transformations
+    context = PipelineContext({"stage1_processed": 0, "stage2_processed": 0, "total_sum": 0})
+
+    def stage1_processor(x: int, ctx: PipelineContext) -> int:
+      """First stage processing with context update."""
+      with ctx["lock"]:
+        ctx["stage1_processed"] += 1
+        ctx["total_sum"] += x
+      return x * 2
+
+    def stage2_processor(x: int, ctx: PipelineContext) -> int:
+      """Second stage processing with context update."""
+      with ctx["lock"]:
+        ctx["stage2_processed"] += 1
+        ctx["total_sum"] += x  # Add transformed value too
+      return x + 10
+
+    # Create two parallel transformers
+    stage1 = ParallelTransformer[int, int](max_workers=2, chunk_size=2).map(stage1_processor)
+    stage2 = ParallelTransformer[int, int](max_workers=2, chunk_size=2).map(stage2_processor)
+
+    data = [1, 2, 3, 4, 5]
+
+    # Chain parallel transformers in pipeline
+    pipeline = Pipeline(data).context(context)
+    result = (
+      pipeline.apply(stage1)  # [2, 4, 6, 8, 10]
+      .apply(stage2)  # [12, 14, 16, 18, 20]
+      .to_list()
+    )
+
+    # Verify final results
+    expected_stage1 = [x * 2 for x in data]  # [2, 4, 6, 8, 10]
+    expected_final = [x + 10 for x in expected_stage1]  # [12, 14, 16, 18, 20]
+    assert result == expected_final
+
+    # Verify context reflects both stages
+    final_context = pipeline.ctx
+    assert final_context["stage1_processed"] == 5
+    assert final_context["stage2_processed"] == 5
+
+    # Total sum should include original values + transformed values
+    original_sum = sum(data)  # 1+2+3+4+5 = 15
+    stage1_sum = sum(expected_stage1)  # 2+4+6+8+10 = 30
+    expected_total = original_sum + stage1_sum  # 15 + 30 = 45
+    assert final_context["total_sum"] == expected_total
+
+  def test_pipeline_context_isolation_with_parallel_processing(self):
+    """Test that different pipeline instances have isolated contexts."""
+
+    # Create base context structure
+    def create_context():
+      return PipelineContext({"count": 0})
+
+    def increment_counter(x: int, ctx: PipelineContext) -> int:
+      """Increment counter in context."""
+      with ctx["lock"]:
+        ctx["count"] += 1
+      return x * 2
+
+    parallel_transformer = ParallelTransformer[int, int](max_workers=2, chunk_size=2)
+    parallel_transformer = parallel_transformer.map(increment_counter)
+
+    data = [1, 2, 3]
+
+    # Create two separate pipeline instances with their own contexts
+    pipeline1 = Pipeline(data).context(create_context())
+    pipeline2 = Pipeline(data).context(create_context())
+
+    # Process with both pipelines
+    result1 = pipeline1.apply(parallel_transformer).to_list()
+    result2 = pipeline2.apply(parallel_transformer).to_list()
+
+    # Both should have same transformation results
+    assert result1 == [2, 4, 6]
+    assert result2 == [2, 4, 6]
+
+    # But contexts should be isolated
+    assert pipeline1.ctx["count"] == 3
+    assert pipeline2.ctx["count"] == 3
+
+    # Verify they are different context objects
+    assert pipeline1.ctx is not pipeline2.ctx

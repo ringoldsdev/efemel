@@ -5,6 +5,9 @@ import itertools
 from typing import Any
 from typing import TypedDict
 from typing import TypeVar
+from typing import overload
+
+from efemel.pipeline.helpers import is_context_aware
 
 from .transformers.transformer import Transformer
 
@@ -28,15 +31,53 @@ class Pipeline[T]:
   def __init__(self, *data: Iterable[T]):
     self.data_source: Iterable[T] = itertools.chain.from_iterable(data) if len(data) > 1 else data[0]
     self.processed_data: Iterator = iter(self.data_source)
+    self.ctx = PipelineContext()
 
-  def apply[U](self, transformer: Transformer[T, U] | Callable[[Iterable[T]], Iterator[U]]) -> "Pipeline[U]":
+  def context(self, ctx: PipelineContext) -> "Pipeline[T]":
+    """
+    Sets the context for the pipeline.
+    """
+    self.ctx = ctx
+    return self
+
+  @overload
+  def apply[U](self, transformer: Transformer[T, U]) -> "Pipeline[U]": ...
+
+  @overload
+  def apply[U](self, transformer: Callable[[Iterable[T]], Iterator[U]]) -> "Pipeline[U]": ...
+
+  @overload
+  def apply[U](
+    self,
+    transformer: Callable[[Iterable[T], PipelineContext], Iterator[U]],
+  ) -> "Pipeline[U]": ...
+
+  def apply[U](
+    self,
+    transformer: Transformer[T, U]
+    | Callable[[Iterable[T]], Iterator[U]]
+    | Callable[[Iterable[T], PipelineContext], Iterator[U]],
+  ) -> "Pipeline[U]":
     """
     Applies a transformer to the current data source.
     """
-    # The transformer is called with the current processed data, producing a new iterator
-    new_data = transformer(self.processed_data)
-    # Create a new pipeline with the transformed data
-    self.processed_data = new_data
+
+    match transformer:
+      case Transformer():
+        # If a Transformer instance is provided, use its __call__ method
+        self.processed_data = transformer(self.processed_data, self.ctx)  # type: ignore
+      case _ if callable(transformer):
+        # If a callable function is provided, call it with the current data and context
+
+        if is_context_aware(transformer):
+          processed_transformer = transformer
+        else:
+          processed_transformer = lambda data, ctx: transformer(data)  # type: ignore  # noqa: E731
+
+        self.processed_data = processed_transformer(self.processed_data, self.ctx)  # type: ignore
+      case _:
+        raise TypeError("Transformer must be a Transformer instance or a callable function")
+
     return self  # type: ignore
 
   def transform[U](self, t: Callable[[Transformer[T, T]], Transformer[T, U]]) -> "Pipeline[U]":
