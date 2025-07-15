@@ -1,7 +1,5 @@
 """Integration tests for Pipeline and Transformer working together."""
 
-import threading
-
 from efemel.pipeline.pipeline import Pipeline
 from efemel.pipeline.transformers.parallel import ParallelTransformer
 from efemel.pipeline.transformers.transformer import PipelineContext
@@ -228,11 +226,11 @@ class TestPipelineParallelTransformerIntegration:
   def test_pipeline_with_parallel_transformer_context_modification(self):
     """Test pipeline calling parallel transformer that safely modifies context."""
     # Create context with statistics to be updated by parallel processing
-    context = PipelineContext({"processed_count": 0, "sum_total": 0, "max_value": 0, "_lock": threading.Lock()})
+    context = PipelineContext({"processed_count": 0, "sum_total": 0, "max_value": 0})
 
     def safe_increment_and_transform(x: int, ctx: PipelineContext) -> int:
       """Safely increment context counters and transform the value."""
-      with ctx["_lock"]:
+      with ctx["lock"]:
         ctx["processed_count"] += 1
         ctx["sum_total"] += x
         ctx["max_value"] = max(ctx["max_value"], x)
@@ -258,11 +256,11 @@ class TestPipelineParallelTransformerIntegration:
   def test_pipeline_accesses_context_after_parallel_processing(self):
     """Test that pipeline can access context data modified by parallel transformer."""
     # Create context with counters
-    context = PipelineContext({"items_processed": 0, "even_count": 0, "odd_count": 0, "_lock": threading.Lock()})
+    context = PipelineContext({"items_processed": 0, "even_count": 0, "odd_count": 0})
 
     def count_and_transform(x: int, ctx: PipelineContext) -> int:
       """Count even/odd numbers and transform."""
-      with ctx["_lock"]:
+      with ctx["lock"]:
         ctx["items_processed"] += 1
         if x % 2 == 0:
           ctx["even_count"] += 1
@@ -298,18 +296,18 @@ class TestPipelineParallelTransformerIntegration:
   def test_multiple_parallel_transformers_sharing_context(self):
     """Test multiple parallel transformers modifying the same context."""
     # Shared context for statistics across transformations
-    context = PipelineContext({"stage1_processed": 0, "stage2_processed": 0, "total_sum": 0, "_lock": threading.Lock()})
+    context = PipelineContext({"stage1_processed": 0, "stage2_processed": 0, "total_sum": 0})
 
     def stage1_processor(x: int, ctx: PipelineContext) -> int:
       """First stage processing with context update."""
-      with ctx["_lock"]:
+      with ctx["lock"]:
         ctx["stage1_processed"] += 1
         ctx["total_sum"] += x
       return x * 2
 
     def stage2_processor(x: int, ctx: PipelineContext) -> int:
       """Second stage processing with context update."""
-      with ctx["_lock"]:
+      with ctx["lock"]:
         ctx["stage2_processed"] += 1
         ctx["total_sum"] += x  # Add transformed value too
       return x + 10
@@ -349,11 +347,11 @@ class TestPipelineParallelTransformerIntegration:
 
     # Create base context structure
     def create_context():
-      return PipelineContext({"count": 0, "_lock": threading.Lock()})
+      return PipelineContext({"count": 0})
 
     def increment_counter(x: int, ctx: PipelineContext) -> int:
       """Increment counter in context."""
-      with ctx["_lock"]:
+      with ctx["lock"]:
         ctx["count"] += 1
       return x * 2
 
