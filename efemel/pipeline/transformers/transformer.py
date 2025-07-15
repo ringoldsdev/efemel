@@ -10,7 +10,7 @@ from typing import Self
 from typing import Union
 from typing import overload
 
-from efemel.pipeline.helpers import create_context_aware_function
+from efemel.pipeline.helpers import is_context_aware
 
 DEFAULT_CHUNK_SIZE = 1000
 
@@ -88,14 +88,17 @@ class Transformer[In, Out]:
 
   def map[U](self, function: PipelineFunction[Out, U]) -> "Transformer[In, U]":
     """Transforms elements, passing context explicitly to the mapping function."""
-    std_function = create_context_aware_function(function)
-    # The operation passed to _pipe receives the chunk and context, and applies the function.
-    return self._pipe(lambda chunk, ctx: [std_function(x, ctx) for x in chunk])
+    if is_context_aware(function):
+      return self._pipe(lambda chunk, ctx: [function(x, ctx) for x in chunk])
+
+    return self._pipe(lambda chunk, _ctx: [function(x) for x in chunk])
 
   def filter(self, predicate: PipelineFunction[Out, bool]) -> "Transformer[In, Out]":
     """Filters elements, passing context explicitly to the predicate function."""
-    std_predicate = create_context_aware_function(predicate)
-    return self._pipe(lambda chunk, ctx: [x for x in chunk if std_predicate(x, ctx)])
+    if is_context_aware(predicate):
+      return self._pipe(lambda chunk, ctx: [x for x in chunk if predicate(x, ctx)])
+
+    return self._pipe(lambda chunk, _ctx: [x for x in chunk if predicate(x)])
 
   @overload
   def flatten[T](self: "Transformer[In, list[T]]") -> "Transformer[In, T]": ...
@@ -112,14 +115,11 @@ class Transformer[In, Out]:
 
   def tap(self, function: PipelineFunction[Out, Any]) -> "Transformer[In, Out]":
     """Applies a side-effect function without modifying the data."""
-    std_function = create_context_aware_function(function)
 
-    def tap_operation(chunk: list[Out], ctx: PipelineContext) -> list[Out]:
-      for item in chunk:
-        std_function(item, ctx)
-      return chunk
+    if is_context_aware(function):
+      return self._pipe(lambda chunk, ctx: [x for x in chunk if function(x, ctx) or True])
 
-    return self._pipe(tap_operation)
+    return self._pipe(lambda chunk, ctx: [x for x in chunk if function(x) or True])
 
   def apply[T](self, t: Callable[[Self], "Transformer[In, T]"]) -> "Transformer[In, T]":
     """Apply another pipeline to the current one."""
