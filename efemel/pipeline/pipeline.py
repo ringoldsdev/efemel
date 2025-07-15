@@ -5,6 +5,9 @@ import itertools
 from typing import Any
 from typing import TypedDict
 from typing import TypeVar
+from typing import overload
+
+from efemel.pipeline.helpers import create_context_aware_function
 
 from .transformers.transformer import Transformer
 
@@ -37,17 +40,39 @@ class Pipeline[T]:
     self.ctx = ctx
     return self
 
+  @overload
+  def apply[U](self, transformer: Transformer[T, U]) -> "Pipeline[U]": ...
+
+  @overload
+  def apply[U](self, transformer: Callable[[Iterable[T]], Iterator[U]]) -> "Pipeline[U]": ...
+
+  @overload
   def apply[U](
-    self, transformer: Transformer[T, U] | Callable[[Iterable[T], PipelineContext], Iterator[U]]
+    self,
+    transformer: Callable[[Iterable[T], PipelineContext], Iterator[U]],
+  ) -> "Pipeline[U]": ...
+
+  def apply[U](
+    self,
+    transformer: Transformer[T, U]
+    | Callable[[Iterable[T]], Iterator[U]]
+    | Callable[[Iterable[T], PipelineContext], Iterator[U]],
   ) -> "Pipeline[U]":
     """
     Applies a transformer to the current data source.
     """
 
-    # The transformer is called with the current processed data, producing a new iterator
-    new_data = transformer(self.processed_data, self.ctx)  # type: ignore
-    # Create a new pipeline with the transformed data
-    self.processed_data = new_data
+    match transformer:
+      case Transformer():
+        # If a Transformer instance is provided, use its __call__ method
+        self.processed_data = transformer(self.processed_data, self.ctx)  # type: ignore
+      case _ if callable(transformer):
+        # If a callable function is provided, call it with the current data and context
+        processed_transformer = create_context_aware_function(transformer)  # type: ignore
+        self.processed_data = processed_transformer(self.processed_data, self.ctx)
+      case _:
+        raise TypeError("Transformer must be a Transformer instance or a callable function")
+
     return self  # type: ignore
 
   def transform[U](self, t: Callable[[Transformer[T, T]], Transformer[T, U]]) -> "Pipeline[U]":
