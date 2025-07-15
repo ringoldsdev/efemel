@@ -1,10 +1,6 @@
-from collections import deque
 from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Iterator
-from concurrent.futures import FIRST_COMPLETED
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import wait
 import copy
 from functools import reduce
 import inspect
@@ -13,6 +9,8 @@ from typing import Any
 from typing import Self
 from typing import Union
 from typing import overload
+
+DEFAULT_CHUNK_SIZE = 1000
 
 # --- Type Aliases ---
 type PipelineFunction[Out, T] = Callable[[Out], T] | Callable[[Out, PipelineContext], T]
@@ -35,17 +33,46 @@ class Transformer[In, Out]:
 
   def __init__(
     self,
-    chunk_size: int = 1000,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
     context: PipelineContext | None = None,
+    transformer: Callable[[list[In]], list[Out]] = lambda chunk: chunk,  # type: ignore
   ):
     self.chunk_size = chunk_size
     self.context = context or PipelineContext()
-    self.transformer = lambda chunk: chunk
+    self.transformer = transformer
 
   @classmethod
-  def init[T](cls, _type_hint: type[T], chunk_size: int = 1000) -> "Transformer[T, T]":
+  def init[T](cls, _type_hint: type[T], chunk_size: int = DEFAULT_CHUNK_SIZE) -> "Transformer[T, T]":
     """Create a new identity pipeline with explicit type hint."""
-    return cls(chunk_size)  # type: ignore
+    return cls(chunk_size=chunk_size)  # type: ignore
+
+  @classmethod
+  def from_transformer[T, U](
+    cls,
+    transformer: "Transformer[T, U]",
+    chunk_size: int | None = None,
+    context: PipelineContext | None = None,
+  ) -> "Transformer[T, U]":
+    """
+    Create a new transformer from an existing transformer.
+
+    This method copies the transformation logic and context from an existing
+    transformer and applies it to a new transformer instance of the target class.
+
+    Args:
+        transformer: The base transformer to copy from.
+        **kwargs: Additional arguments to pass to the new transformer constructor.
+
+    Returns:
+        A new transformer instance with the same transformation logic.
+    """
+
+    # Create new instance with the transformer's chunk_size and context as defaults
+    return cls(
+      chunk_size=chunk_size or transformer.chunk_size,
+      context=context or copy.deepcopy(transformer.context),
+      transformer=copy.deepcopy(transformer.transformer),  # type: ignore
+    )
 
   def _chunk_generator(self, data: Iterable[In]) -> Iterator[list[In]]:
     """Breaks an iterable into chunks of a specified size."""
@@ -56,7 +83,7 @@ class Transformer[In, Out]:
   def _pipe[U](self, operation: Callable[[list[Out]], list[U]]) -> "Transformer[In, U]":
     """Composes the current transformer with a new chunk-wise operation."""
     prev_transformer = self.transformer
-    self.transformer = lambda chunk: operation(prev_transformer(chunk))
+    self.transformer = lambda chunk: operation(prev_transformer(chunk))  # type: ignore
     return self  # type: ignore
 
   def _create_context_aware_function(self, func: Callable) -> Callable:
@@ -141,119 +168,3 @@ class Transformer[In, Out]:
       yield reduce(reducer, self(data), initial)
 
     return _reduce
-
-
-class ConcurrentTransformer[In, Out](Transformer[In, Out]):
-  """
-  A transformer that executes operations concurrently using multiple threads.
-
-  This transformer overrides the __call__ method to process data chunks
-  in parallel, yielding results as they become available.
-  """
-
-  def __init__(
-    self,
-    max_workers: int = 4,
-    ordered: bool = True,
-    chunk_size: int = 1000,
-    context: PipelineContext | None = None,
-  ):
-    """
-    Initialize the concurrent transformer.
-
-    Args:
-        max_workers: Maximum number of worker threads.
-        ordered: If True, results are yielded in order. If False, results
-                are yielded as they complete.
-        chunk_size: Size of data chunks to process.
-        context: Pipeline context for operations.
-    """
-    super().__init__(chunk_size, context)
-    self.max_workers = max_workers
-    self.ordered = ordered
-
-  @classmethod
-  def from_transformer[T, U](
-    cls, transformer: Transformer[T, U], max_workers: int = 4, ordered: bool = True
-  ) -> "ConcurrentTransformer[T, U]":
-    """
-    Create a ConcurrentTransformer from an existing Transformer.
-
-    Args:
-        transformer: The base transformer to make concurrent.
-        max_workers: Maximum number of worker threads.
-        ordered: Whether to maintain order of results.
-
-    Returns:
-        A new ConcurrentTransformer with the same transformation logic.
-    """
-    concurrent = cls(max_workers, ordered, transformer.chunk_size, copy.deepcopy(transformer.context))
-    concurrent.transformer = copy.deepcopy(transformer.transformer)
-    return concurrent  # type: ignore
-
-  def __call__(self, data: Iterable[In]) -> Iterator[Out]:
-    """
-    Executes the transformer on data concurrently, yielding results as processed.
-
-    Args:
-        data: Input data to process.
-
-    Returns:
-        Iterator yielding processed results.
-    """
-
-    def process_chunk(chunk: list[In]) -> list[Out]:
-      """Process a single chunk using the transformer."""
-      return self.transformer(chunk)
-
-    def _ordered_generator(chunks_iter: Iterator[list[In]], executor: ThreadPoolExecutor) -> Iterator[list[Out]]:
-      """Generate results in original order."""
-      from concurrent.futures import Future
-
-      futures: deque[Future[list[Out]]] = deque()
-
-      # Submit initial batch of work
-      for _ in range(self.max_workers + 1):
-        try:
-          chunk = next(chunks_iter)
-          futures.append(executor.submit(process_chunk, chunk))
-        except StopIteration:
-          break
-
-      # Process remaining chunks, maintaining order
-      while futures:
-        yield futures.popleft().result()
-        try:
-          chunk = next(chunks_iter)
-          futures.append(executor.submit(process_chunk, chunk))
-        except StopIteration:
-          continue
-
-    def _unordered_generator(chunks_iter: Iterator[list[In]], executor: ThreadPoolExecutor) -> Iterator[list[Out]]:
-      """Generate results as they complete (unordered)."""
-      # Submit initial batch of work
-      futures = {executor.submit(process_chunk, chunk) for chunk in itertools.islice(chunks_iter, self.max_workers + 1)}
-
-      while futures:
-        done, futures = wait(futures, return_when=FIRST_COMPLETED)
-        for future in done:
-          yield future.result()
-          try:
-            chunk = next(chunks_iter)
-            futures.add(executor.submit(process_chunk, chunk))
-          except StopIteration:
-            continue
-
-    def result_iterator_manager() -> Iterator[Out]:
-      """Manage the thread pool and flatten results."""
-      with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-        chunks_to_process = self._chunk_generator(data)
-
-        gen_func = _ordered_generator if self.ordered else _unordered_generator
-        processed_chunks_iterator = gen_func(chunks_to_process, executor)
-
-        # Flatten the iterator of chunks into an iterator of items
-        for result_chunk in processed_chunks_iterator:
-          yield from result_chunk
-
-    return result_iterator_manager()
