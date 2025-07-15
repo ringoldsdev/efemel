@@ -406,7 +406,7 @@ def chunked_pipeline_per_item_approach(data) -> list[int]:
   return list(PIPELINE_PER_ITEM.run(data))
 
 
-PIPELINE_TRANSFORMER = (
+PIPELINE_TRANSFORMER: Transformer = (
   Transformer()
   .filter(lambda x: x % 2 == 0)  # Filter even numbers
   .map(lambda x: x * 2)  # Double them

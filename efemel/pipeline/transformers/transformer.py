@@ -3,23 +3,17 @@ from collections.abc import Iterable
 from collections.abc import Iterator
 import copy
 from functools import reduce
-import inspect
 import itertools
 from typing import Any
 from typing import Self
 from typing import Union
 from typing import overload
 
+from efemel.pipeline.helpers import PipelineContext
 from efemel.pipeline.helpers import is_context_aware
+from efemel.pipeline.helpers import is_context_aware_reduce
 
 DEFAULT_CHUNK_SIZE = 1000
-
-
-# --- Type Aliases ---
-class PipelineContext(dict):
-  """Generic, untyped context available to all pipeline operations."""
-
-  pass
 
 
 type PipelineFunction[Out, T] = Callable[[Out], T] | Callable[[Out, PipelineContext], T]
@@ -73,18 +67,6 @@ class Transformer[In, Out]:
     # The new transformer chain ensures the context `ctx` is passed at each step.
     self.transformer = lambda chunk, ctx: operation(prev_transformer(chunk, ctx), ctx)  # type: ignore
     return self  # type: ignore
-
-  def _create_reduce_function(self, func: PipelineReduceFunction) -> Callable[[Any, Any, PipelineContext], Any]:
-    """Normalizes a user-provided reduce function to accept a context argument."""
-    try:
-      sig = inspect.signature(func)
-      params = [p for p in sig.parameters.values() if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
-      if len(params) >= 3:
-        return func  # type: ignore
-    except (ValueError, TypeError):
-      pass
-    # Adapt a simple reducer (e.g., lambda acc, val: acc + val).
-    return lambda acc, value, ctx: func(acc, value)  # type: ignore
 
   def map[U](self, function: PipelineFunction[Out, U]) -> "Transformer[In, U]":
     """Transforms elements, passing context explicitly to the mapping function."""
@@ -141,19 +123,29 @@ class Transformer[In, Out]:
 
   def reduce[U](self, function: PipelineReduceFunction[U, Out], initial: U):
     """Reduces elements to a single value (terminal operation)."""
-    std_reducer = self._create_reduce_function(function)
 
+    if is_context_aware_reduce(function):
+
+      def _reduce_with_context(data: Iterable[In], context: PipelineContext | None = None) -> Iterator[U]:
+        # The context for the run is determined here.
+        run_context = context or self.context
+
+        data_iterator = self(data, run_context)
+
+        def function_wrapper(acc: U, value: Out) -> U:
+          return function(acc, value, run_context)
+
+        yield reduce(function_wrapper, data_iterator, initial)
+
+      return _reduce_with_context
+
+    # Not context-aware, so we adapt the function to ignore the context.
     def _reduce(data: Iterable[In], context: PipelineContext | None = None) -> Iterator[U]:
       # The context for the run is determined here.
       run_context = context or self.context
 
-      # The generator now needs the context to pass to the transformer.
       data_iterator = self(data, run_context)
 
-      # We need a new reducer that curries the context for functools.reduce.
-      def reducer_with_context(acc, value):
-        return std_reducer(acc, value, run_context)
-
-      yield reduce(reducer_with_context, data_iterator, initial)
+      yield reduce(function, data_iterator, initial)
 
     return _reduce

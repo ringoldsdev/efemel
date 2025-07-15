@@ -7,7 +7,7 @@ from typing import TypedDict
 from typing import TypeVar
 from typing import overload
 
-from efemel.pipeline.helpers import create_context_aware_function
+from efemel.pipeline.helpers import is_context_aware
 
 from .transformers.transformer import Transformer
 
@@ -68,8 +68,13 @@ class Pipeline[T]:
         self.processed_data = transformer(self.processed_data, self.ctx)  # type: ignore
       case _ if callable(transformer):
         # If a callable function is provided, call it with the current data and context
-        processed_transformer = create_context_aware_function(transformer)  # type: ignore
-        self.processed_data = processed_transformer(self.processed_data, self.ctx)
+
+        if is_context_aware(transformer):
+          processed_transformer = transformer
+        else:
+          processed_transformer = lambda data, ctx: transformer(data)  # type: ignore  # noqa: E731
+
+        self.processed_data = processed_transformer(self.processed_data, self.ctx)  # type: ignore
       case _:
         raise TypeError("Transformer must be a Transformer instance or a callable function")
 
