@@ -117,11 +117,10 @@ class ParallelTransformer[In, Out](Transformer[In, Out]):
   def from_transformer[T, U](
     cls,
     transformer: Transformer[T, U],
-    max_workers: int = 4,
-    ordered: bool = True,
     chunk_size: int | None = None,
     context: PipelineContext | None = None,
-    **kwargs,
+    max_workers: int = 4,
+    ordered: bool = True,
   ) -> "ParallelTransformer[T, U]":
     """
     Create a ParallelTransformer from an existing Transformer.
@@ -131,19 +130,17 @@ class ParallelTransformer[In, Out](Transformer[In, Out]):
 
     Args:
         transformer: The base transformer to copy from.
-        max_workers: Maximum number of worker threads.
-        ordered: Whether to maintain order of results.
-        **kwargs: Additional arguments passed to the constructor.
+        chunk_size: Optional chunk size override.
+        context: Optional context override.
+        **kwargs: Additional arguments including max_workers and ordered.
 
     Returns:
         A new ParallelTransformer with the same transformation logic.
     """
-    # Pass the ParallelTransformer-specific parameters via kwargs
-
     return cls(
       chunk_size=chunk_size or transformer.chunk_size,
       context=context or copy.deepcopy(transformer.context),
       transformer=copy.deepcopy(transformer.transformer),  # type: ignore
       max_workers=max_workers,
       ordered=ordered,
-    )  # type: ignore
+    )
