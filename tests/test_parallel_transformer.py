@@ -4,6 +4,7 @@ import threading
 import time
 from unittest.mock import patch
 
+from efemel.pipeline.errors import ErrorHandler
 from efemel.pipeline.transformers.parallel import ParallelTransformer
 from efemel.pipeline.transformers.transformer import PipelineContext
 from efemel.pipeline.transformers.transformer import Transformer
@@ -357,25 +358,40 @@ class TestParallelTransformerContextModification:
     assert context["max_value"] == max(data)
 
 
-class TestSafeTransformer:
+class TestSafeParallelTransformer:
   def test_safe_with_no_errors(self):
     """Test safe run with successful transformation."""
-    transformer = ParallelTransformer.init(int).catch(
-      lambda t: t.map(lambda x: x * 2),
-      on_error=lambda chunk, error, context: [],
-    )
+    transformer = ParallelTransformer.init(int).catch(lambda t: t.map(lambda x: x * 2))
     data = [1, 2, 3]
     result = list(transformer(data))
     assert result == [2, 4, 6]
 
   def test_safe_with_error_handling(self):
     """Test safe run with error handling."""
-    transformer = ParallelTransformer.init(int).catch(
+    errored_chunks = []
+    transformer = ParallelTransformer.init(int, chunk_size=1).catch(
       lambda t: t.map(lambda x: x / 0),  # This will raise an error
-      on_error=lambda chunk, error, context: [0],  # Return 0 on error
+      on_error=lambda chunk, error, context: errored_chunks.append(chunk),
     )
     data = [1, 2, 3]
     result = list(transformer(data))
-    # Note that we get 3 values back because we're defaulting to chunk_size=1000
-    # All items are handled in a single chunk and we return a single value
-    assert result == [0]
+    assert result == []
+    # Note that we get 3 values back because we've specified chunk_size=1
+    assert errored_chunks == [[1], [2], [3]]
+
+  def test_global_error_handling(self):
+    """Test safe run with error handling."""
+
+    errored_chunks = []
+
+    error_handler = ErrorHandler()
+    error_handler.on_error(lambda chunk, error, context: errored_chunks.append(chunk))
+
+    transformer = (
+      ParallelTransformer.init(int, chunk_size=1).on_error(error_handler).catch(lambda t: t.map(lambda x: x / 0))
+    )
+    data = [1, 2, 3]
+    result = list(transformer(data))
+    assert result == []
+    # Note that we get 3 values back because we've specified chunk_size=1
+    assert errored_chunks == [[1], [2], [3]]

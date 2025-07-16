@@ -9,6 +9,7 @@ from typing import Self
 from typing import Union
 from typing import overload
 
+from efemel.pipeline.errors import ErrorHandler
 from efemel.pipeline.helpers import PipelineContext
 from efemel.pipeline.helpers import is_context_aware
 from efemel.pipeline.helpers import is_context_aware_reduce
@@ -38,6 +39,7 @@ class Transformer[In, Out]:
     self.context: PipelineContext = PipelineContext()
     # The default transformer now accepts and ignores a context argument.
     self.transformer: InternalTransformer[In, Out] = transformer or (lambda chunk, ctx: chunk)  # type: ignore
+    self.error_handler = ErrorHandler()
 
   @classmethod
   def init[T](cls, _type_hint: type[T], chunk_size: int = DEFAULT_CHUNK_SIZE) -> "Transformer[T, T]":
@@ -56,11 +58,15 @@ class Transformer[In, Out]:
       transformer=copy.deepcopy(transformer.transformer),  # type: ignore
     )
 
-  def on_error(self, handler: ChunkErrorHandler[In, Out]) -> "Transformer[In, Out]":
+  def on_error(self, handler: ChunkErrorHandler[In, Out] | ErrorHandler) -> "Transformer[In, Out]":
     """Registers an error handler for the transformer."""
     # This method is a placeholder for future error handling logic.
     # Currently, it does not modify the transformer behavior.
-    self.error_handler = handler
+    match handler:
+      case ErrorHandler():
+        self.error_handler = handler
+      case _ if callable(handler):
+        self.error_handler.on_error(handler)  # type: ignore
     return self
 
   def _chunk_generator(self, data: Iterable[In]) -> Iterator[list[In]]:
@@ -168,10 +174,8 @@ class Transformer[In, Out]:
     If the sub-pipeline fails for a chunk, the on_error handler is invoked.
     """
 
-    # Check if we have any error handlers available
-    error_handler = self.error_handler if hasattr(self, "error_handler") else None or on_error
-
-    assert error_handler, "No error handler provided for Transformer.catch"
+    if on_error:
+      self.on_error(on_error)  # type: ignore
 
     # Create a blank transformer for the sub-pipeline
     temp_transformer = Transformer.init(_type_hint=..., chunk_size=self.chunk_size)  # type: ignore
@@ -186,6 +190,7 @@ class Transformer[In, Out]:
         return sub_transformer_func(chunk, ctx)
       except Exception as e:
         # On failure, delegate to the chunk-based error handler
-        return error_handler(chunk, e, ctx) or []  # type: ignore
+        self.error_handler.handle(chunk, e, ctx)
+        return []
 
     return self._pipe(operation)  # type: ignore

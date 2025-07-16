@@ -1,5 +1,6 @@
 """Tests for the Transformer class."""
 
+from efemel.pipeline.errors import ErrorHandler
 from efemel.pipeline.transformers.transformer import PipelineContext
 from efemel.pipeline.transformers.transformer import Transformer
 
@@ -240,41 +241,36 @@ class TestTransformerFromTransformer:
 class TestSafeTransformer:
   def test_safe_with_no_errors(self):
     """Test safe run with successful transformation."""
-    transformer = Transformer.init(int).catch(
-      lambda t: t.map(lambda x: x * 2),
-      on_error=lambda chunk, error, context: [],
-    )
+    transformer = Transformer.init(int).catch(lambda t: t.map(lambda x: x * 2))
     data = [1, 2, 3]
     result = list(transformer(data))
     assert result == [2, 4, 6]
 
   def test_safe_with_error_handling(self):
     """Test safe run with error handling."""
+    errored_chunks = []
     transformer = Transformer.init(int, chunk_size=1).catch(
       lambda t: t.map(lambda x: x / 0),  # This will raise an error
-      on_error=lambda chunk, error, context: [0],  # Return 0 on error
+      on_error=lambda chunk, error, context: errored_chunks.append(chunk),  # Return 0 on error
     )
     data = [1, 2, 3]
     result = list(transformer(data))
+    assert result == []
     # Note that we get 3 values back because we've specified chunk_size=1
-    # Without it, we would get only one 0 for the whole chunk
-    assert result == [0, 0, 0]  # All items should return the error value
+    assert errored_chunks == [[1], [2], [3]]
 
   def test_global_error_handling(self):
     """Test safe run with error handling."""
 
-    def error_handler(chunk, error, context):
-      return [0]  # Return 0 on error
+    errored_chunks = []
 
-    transformer = (
-      Transformer.init(int, chunk_size=1)
-      .on_error(error_handler)
-      .catch(
-        lambda t: t.map(lambda x: x / 0)  # Return 0 on error
-      )
-    )
+    error_handler = ErrorHandler()
+    error_handler.on_error(lambda chunk, error, context: errored_chunks.append(chunk))
+
+    transformer = Transformer.init(int, chunk_size=1).on_error(error_handler).catch(lambda t: t.map(lambda x: x / 0))
     data = [1, 2, 3]
     result = list(transformer(data))
+
+    assert result == []
     # Note that we get 3 values back because we've specified chunk_size=1
-    # Without it, we would get only one 0 for the whole chunk
-    assert result == [0, 0, 0]  # All items should return the error value
+    assert errored_chunks == [[1], [2], [3]]
