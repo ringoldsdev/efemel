@@ -16,6 +16,7 @@ authors = [
 ]
 dependencies = [
     "click>=8.0.0",
+    "laygo>=0.1.1"
 ]
 
 [project.scripts]

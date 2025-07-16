@@ -135,6 +135,7 @@ name = "efemel"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
+    { name = "laygo" },
 ]
 
 [package.optional-dependencies]
@@ -148,6 +149,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
+    { name = "laygo", specifier = ">=0.1.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-xdist", extras = ["psutil"], marker = "extra == 'dev'", specifier = ">=3.8.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
@@ -251,6 +253,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/70/09/d904a6e96f76ff214be59e7aa6ef7190008f52a0ab6689760a98de0bf37d/keyring-25.6.0.tar.gz", hash = "sha256:0b39998aa941431eb3d9b0d4b2460bc773b9df6fed7621c2dfb291a7e0187a66", size = 62750, upload-time = "2024-12-25T15:26:45.782Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d3/32/da7f44bcb1105d3e88a0b74ebdca50c59121d2ddf71c9e34ba47df7f3a56/keyring-25.6.0-py3-none-any.whl", hash = "sha256:552a3f7af126ece7ed5c89753650eec89c7eaae8617d0aa4d9ad2b75111266bd", size = 39085, upload-time = "2024-12-25T15:26:44.377Z" },
+]
+
+[[package]]
+name = "laygo"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/27/6656d1fb9d3bf5983902ed91604e2ed0be9beeeea5c0a38232b386029e45/laygo-0.1.1.tar.gz", hash = "sha256:b8a030cfc509f89e099317f5722c23ae3c3aa23ff6d6dbf38a8f857a72edb4ef", size = 44452, upload-time = "2025-07-16T18:20:47.478Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/74/0a/1ef73e31b24f10a68b69c2c891b619c2c0cebaa9338d08956c317131af55/laygo-0.1.1-py3-none-any.whl", hash = "sha256:28f804f8a873487f4b0e5e0502d0294a50a65a9285fe746560925571f941f7c3", size = 11933, upload-time = "2025-07-16T18:20:46.435Z" },
 ]
 
 [[package]]
