@@ -1,5 +1,7 @@
 """Tests for the Transformer class."""
 
+import pytest
+
 from efemel.pipeline.errors import ErrorHandler
 from efemel.pipeline.transformers.transformer import PipelineContext
 from efemel.pipeline.transformers.transformer import Transformer
@@ -274,3 +276,45 @@ class TestSafeTransformer:
     assert result == []
     # Note that we get 3 values back because we've specified chunk_size=1
     assert errored_chunks == [[1], [2], [3]]
+
+  def test_safe_with_short_circuit(self):
+    """Test safe run with error handling."""
+
+    def set_error_context(_chunk, _error, context):
+      context["error_occurred"] = True
+
+    transformer = (
+      Transformer.init(int, chunk_size=1)
+      .catch(
+        lambda t: t.map(lambda x: x / 0),  # This will raise an error
+        on_error=set_error_context,
+      )
+      .short_circuit(lambda ctx: ctx["error_occurred"])
+    )
+
+    data = [1, 2, 3]
+    with pytest.raises(RuntimeError):
+      list(transformer(data))
+
+  def test_safe_with_short_circuit_that_raises(self):
+    """Test safe run with error handling."""
+
+    def set_error_context(_chunk, _error, context):
+      context["error_occurred"] = True
+
+    def raise_on_context_error(ctx):
+      if ctx.get("error_occurred"):
+        raise RuntimeError("Short-circuit condition met, stopping execution.")
+
+    transformer = (
+      Transformer.init(int, chunk_size=1)
+      .catch(
+        lambda t: t.map(lambda x: x / 0),  # This will raise an error
+        on_error=set_error_context,
+      )
+      .short_circuit(raise_on_context_error)
+    )
+
+    data = [1, 2, 3]
+    with pytest.raises(RuntimeError):
+      list(transformer(data))

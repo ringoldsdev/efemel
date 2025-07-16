@@ -13,7 +13,8 @@ def raise_error(chunk: list, error: Exception, context: PipelineContext) -> None
 class ErrorHandler:
   """
   Stores and executes a chain of error handlers.
-  Handlers are executed in the order they are added.
+  Handlers are executed in reverse order. The assumption is that the closer the handler
+  is to the error, the earlier it should be executed.
   """
 
   def __init__(self):

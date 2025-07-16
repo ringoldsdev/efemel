@@ -194,3 +194,31 @@ class Transformer[In, Out]:
         return []
 
     return self._pipe(operation)  # type: ignore
+
+  def short_circuit(self, function: Callable[[PipelineContext], bool | None]) -> "Transformer[In, Out]":
+    """
+    Executes a function on the context before processing the next step for a chunk.
+
+    This can be used for short-circuiting by raising an exception based on the
+    context's state, which halts the pipeline. If the function executes
+    successfully, the data chunk is passed through unmodified to the next
+    operation in the chain.
+
+    Args:
+        function: A callable that accepts the `PipelineContext` as its sole
+                  argument. Its return value is ignored.
+
+    Returns:
+        The transformer instance for method chaining.
+    """
+
+    def operation(chunk: list[Out], ctx: PipelineContext) -> list[Out]:
+      """The internal operation that wraps the user's function."""
+      # Execute the user's function with the current context.
+      if function(ctx):
+        # If the function returns True, we raise an exception to stop the pipeline.
+        raise RuntimeError("Short-circuit condition met, stopping execution.")
+      # If no exception was raised, the chunk passes through.
+      return chunk
+
+    return self._pipe(operation)
