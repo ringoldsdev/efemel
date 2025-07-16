@@ -360,7 +360,10 @@ class TestParallelTransformerContextModification:
 class TestSafeTransformer:
   def test_safe_with_no_errors(self):
     """Test safe run with successful transformation."""
-    transformer = ParallelTransformer.init(int).catch(lambda t: t.map(lambda x: x * 2))
+    transformer = ParallelTransformer.init(int).catch(
+      lambda t: t.map(lambda x: x * 2),
+      on_error=lambda chunk, error, context: [],
+    )
     data = [1, 2, 3]
     result = list(transformer(data))
     assert result == [2, 4, 6]

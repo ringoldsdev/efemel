@@ -56,6 +56,13 @@ class Transformer[In, Out]:
       transformer=copy.deepcopy(transformer.transformer),  # type: ignore
     )
 
+  def on_error(self, handler: ChunkErrorHandler[In, Out]) -> "Transformer[In, Out]":
+    """Registers an error handler for the transformer."""
+    # This method is a placeholder for future error handling logic.
+    # Currently, it does not modify the transformer behavior.
+    self.error_handler = handler
+    return self
+
   def _chunk_generator(self, data: Iterable[In]) -> Iterator[list[In]]:
     """Breaks an iterable into chunks of a specified size."""
     data_iter = iter(data)
@@ -154,12 +161,18 @@ class Transformer[In, Out]:
   def catch[U](
     self,
     sub_pipeline_builder: Callable[["Transformer[Out, Out]"], "Transformer[Out, U]"],
-    on_error: ChunkErrorHandler[Out, U] = lambda chunk, error, context: [],
+    on_error: ChunkErrorHandler[Out, U] | None = None,
   ) -> "Transformer[In, U]":
     """
     Isolates a sub-pipeline in a chunk-based try-catch block.
     If the sub-pipeline fails for a chunk, the on_error handler is invoked.
     """
+
+    # Check if we have any error handlers available
+    error_handler = self.error_handler if hasattr(self, "error_handler") else None or on_error
+
+    assert error_handler, "No error handler provided for Transformer.catch"
+
     # Create a blank transformer for the sub-pipeline
     temp_transformer = Transformer.init(_type_hint=..., chunk_size=self.chunk_size)  # type: ignore
 
@@ -173,6 +186,6 @@ class Transformer[In, Out]:
         return sub_transformer_func(chunk, ctx)
       except Exception as e:
         # On failure, delegate to the chunk-based error handler
-        return on_error(chunk, e, ctx) or []
+        return error_handler(chunk, e, ctx) or []  # type: ignore
 
     return self._pipe(operation)  # type: ignore
