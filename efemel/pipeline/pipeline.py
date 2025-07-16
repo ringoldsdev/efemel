@@ -3,10 +3,10 @@ from collections.abc import Iterable
 from collections.abc import Iterator
 import itertools
 from typing import Any
-from typing import TypedDict
 from typing import TypeVar
 from typing import overload
 
+from efemel.pipeline.helpers import PipelineContext
 from efemel.pipeline.helpers import is_context_aware
 
 from .transformers.transformer import Transformer
@@ -14,12 +14,6 @@ from .transformers.transformer import Transformer
 # --- Type Aliases ---
 T = TypeVar("T")
 PipelineFunction = Callable[[T], Any]
-
-
-class PipelineContext(TypedDict):
-  """Global context available to all pipeline operations."""
-
-  pass
 
 
 class Pipeline[T]:
