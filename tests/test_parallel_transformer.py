@@ -355,3 +355,24 @@ class TestParallelTransformerContextModification:
     assert context["total_sum"] == sum(data)
     assert context["item_count"] == len(data)
     assert context["max_value"] == max(data)
+
+
+class TestSafeTransformer:
+  def test_safe_with_no_errors(self):
+    """Test safe run with successful transformation."""
+    transformer = ParallelTransformer.init(int).catch(lambda t: t.map(lambda x: x * 2))
+    data = [1, 2, 3]
+    result = list(transformer(data))
+    assert result == [2, 4, 6]
+
+  def test_safe_with_error_handling(self):
+    """Test safe run with error handling."""
+    transformer = ParallelTransformer.init(int).catch(
+      lambda t: t.map(lambda x: x / 0),  # This will raise an error
+      on_error=lambda chunk, error, context: [0],  # Return 0 on error
+    )
+    data = [1, 2, 3]
+    result = list(transformer(data))
+    # Note that we get 3 values back because we're defaulting to chunk_size=1000
+    # All items are handled in a single chunk and we return a single value
+    assert result == [0]

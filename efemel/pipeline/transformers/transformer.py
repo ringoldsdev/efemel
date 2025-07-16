@@ -154,7 +154,7 @@ class Transformer[In, Out]:
   def catch[U](
     self,
     sub_pipeline_builder: Callable[["Transformer[Out, Out]"], "Transformer[Out, U]"],
-    on_error: ChunkErrorHandler[Out, U],
+    on_error: ChunkErrorHandler[Out, U] = lambda chunk, error, context: [],
   ) -> "Transformer[In, U]":
     """
     Isolates a sub-pipeline in a chunk-based try-catch block.
@@ -173,6 +173,6 @@ class Transformer[In, Out]:
         return sub_transformer_func(chunk, ctx)
       except Exception as e:
         # On failure, delegate to the chunk-based error handler
-        return on_error(chunk, e, ctx)
+        return on_error(chunk, e, ctx) or []
 
     return self._pipe(operation)  # type: ignore

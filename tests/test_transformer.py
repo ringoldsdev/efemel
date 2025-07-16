@@ -235,3 +235,24 @@ class TestTransformerFromTransformer:
     # Should still have same transformation logic
     data = [1, 2, 3]
     assert list(source(data)) == list(target(data))
+
+
+class TestSafeTransformer:
+  def test_safe_with_no_errors(self):
+    """Test safe run with successful transformation."""
+    transformer = Transformer.init(int).catch(lambda t: t.map(lambda x: x * 2))
+    data = [1, 2, 3]
+    result = list(transformer(data))
+    assert result == [2, 4, 6]
+
+  def test_safe_with_error_handling(self):
+    """Test safe run with error handling."""
+    transformer = Transformer.init(int, chunk_size=1).catch(
+      lambda t: t.map(lambda x: x / 0),  # This will raise an error
+      on_error=lambda chunk, error, context: [0],  # Return 0 on error
+    )
+    data = [1, 2, 3]
+    result = list(transformer(data))
+    # Note that we get 3 values back because we've specified chunk_size=1
+    # Without it, we would get only one 0 for the whole chunk
+    assert result == [0, 0, 0]  # All items should return the error value

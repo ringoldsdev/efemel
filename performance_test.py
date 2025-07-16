@@ -412,8 +412,7 @@ PIPELINE_TRANSFORMER: Transformer = Transformer().catch(
     .map(lambda x: x * 2)  # Double them
     .filter(lambda x: x > 100)  # Filter > 100
     .map(lambda x: x + 1)
-  ),
-  lambda item, error, context: print(f"Error processing item {item}: {error} in context {context}"),
+  )
 )
 
 
