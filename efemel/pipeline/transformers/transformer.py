@@ -21,6 +21,7 @@ type PipelineReduceFunction[U, Out] = Callable[[U, Out], U] | Callable[[U, Out, 
 
 # The internal transformer function signature is changed to explicitly accept a context.
 type InternalTransformer[In, Out] = Callable[[list[In], PipelineContext], list[Out]]
+type ChunkErrorHandler[In, U] = Callable[[list[In], Exception, PipelineContext], list[U]]
 
 
 class Transformer[In, Out]:
@@ -149,3 +150,29 @@ class Transformer[In, Out]:
       yield reduce(function, data_iterator, initial)  # type: ignore
 
     return _reduce
+
+  def catch[U](
+    self,
+    sub_pipeline_builder: Callable[["Transformer[Out, Out]"], "Transformer[Out, U]"],
+    on_error: ChunkErrorHandler[Out, U],
+  ) -> "Transformer[In, U]":
+    """
+    Isolates a sub-pipeline in a chunk-based try-catch block.
+    If the sub-pipeline fails for a chunk, the on_error handler is invoked.
+    """
+    # Create a blank transformer for the sub-pipeline
+    temp_transformer = Transformer.init(_type_hint=..., chunk_size=self.chunk_size)  # type: ignore
+
+    # Build the sub-pipeline and get its internal transformer function
+    sub_pipeline = sub_pipeline_builder(temp_transformer)
+    sub_transformer_func = sub_pipeline.transformer
+
+    def operation(chunk: list[Out], ctx: PipelineContext) -> list[U]:
+      try:
+        # Attempt to process the whole chunk with the sub-pipeline
+        return sub_transformer_func(chunk, ctx)
+      except Exception as e:
+        # On failure, delegate to the chunk-based error handler
+        return on_error(chunk, e, ctx)
+
+    return self._pipe(operation)  # type: ignore

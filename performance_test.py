@@ -406,12 +406,14 @@ def chunked_pipeline_per_item_approach(data) -> list[int]:
   return list(PIPELINE_PER_ITEM.run(data))
 
 
-PIPELINE_TRANSFORMER: Transformer = (
-  Transformer()
-  .filter(lambda x: x % 2 == 0)  # Filter even numbers
-  .map(lambda x: x * 2)  # Double them
-  .filter(lambda x: x > 100)  # Filter > 100
-  .map(lambda x: x + 1)
+PIPELINE_TRANSFORMER: Transformer = Transformer().catch(
+  lambda t: (
+    t.filter(lambda x: x % 2 == 0)  # Filter even numbers
+    .map(lambda x: x * 2)  # Double them
+    .filter(lambda x: x > 100)  # Filter > 100
+    .map(lambda x: x + 1)
+  ),
+  lambda item, error, context: print(f"Error processing item {item}: {error} in context {context}"),
 )
 
 
@@ -441,7 +443,7 @@ def run_performance_test():
     "ChunkedGeneratorListComp": chunked_generator_listcomp_approach,
     "ChunkedPipeline": chunked_pipeline_approach,
     "Pipeline": pipeline_approach,
-    # "ChunkedPipelinePerItem": chunked_pipeline_per_item_approach,
+    "ChunkedPipelinePerItem": chunked_pipeline_per_item_approach,
     # "ChunkedPipelineGenerator": chunked_pipeline_generator_approach,
     # "ChunkedPipelineSimple": chunked_pipeline_simple_approach,
     # "ListComprehension": list_comprehension_approach,
